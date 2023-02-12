@@ -1,33 +1,90 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-contract gen {
+contract Genealogy {
     struct Partner {
-        uint256 id;
+        uint256 position_id;
         address wallet_addres;
         string ebr_code;
-        string placement_id; // left or right of the upline
+        string direction; // left or right of the upline
         uint256 balance;
+        uint256 created_at;
+        uint256 last_update;
     }
-    mapping(uint256 => Partner) public partners;
-    uint256[] public childrens;
-    uint256 public partnerCount;
-    uint256 public left_child;
-    uint256 public right_child;
 
-    constructor() public {
+    mapping(uint256 => Partner) public partnersByPositionId;
+    mapping(string => Partner) public  partnersByWalletAddress;
+    mapping(string => Partner) public partnersByEbrCode;
+    uint256 public partnerCount;
+
+    constructor() {
         partnerCount = 0;
     }
 
+    function isValidEbrCode(uint256 _ebr_code) public {
+        if (partnersByEbrCode[_ebr_code]){
+            return true;
+        }
+        else{
+            return false;
+        }
+    }
+
+    function isValidPositionId(uint256 _position_id) public {
+        if (partnersByPositionId[_position_id]){
+            return true;
+        }
+        else{
+            return false;
+        }
+    }
+
+    function isValidDirection(string _direction) public {
+        if (_direction=='r' | _direction == 'l'){
+            return true;
+        }
+        else{
+            return false;
+        }
+    }
+
+    function generatePositionId(uint256 _upline_postion_id,string _direction) public {
+        if (isValidDirection(_direction)){
+            if (isValidPositionId(_upline_postion_id)==true){
+                if (_direction == 'r'){
+                    return _upline_postion_id*2+2;
+                }
+                else{
+                    return _upline_postion_id*2+1;
+                }
+            }
+            else{
+                return "invalid upline position_id";
+            }
+        }
+        else{
+            return "invalid direction passed. direction should be r or l (r for right and l for left)";
+        }
+    }
+
+    function getPositionIdFromEbrCode(uint256 _ebr_code)public{
+        if (isValidEbrCode(_ebr_code)){
+            partner = partnersByEbrCode[_ebr_code];
+            return partner.position_id;
+        }
+    }
+
     function addPartner(
-        address _wallet_address,
-        string memory _ebr_code,
-        string memory _placement_id,
-        uint256 _balance
+        string storage _ebr_code,
+        string storage _direction,
+        string storage _upline_ebr_code,
+        uint256 storage _balance
     ) public {
-        partners[partnerCount] = Partner(
+        uint256 upline_position_id = getPositionIdFromEbrCode(_upline_ebr_code);
+        uint256 new_position_id = generatePositionId(_upline_postion_id, _direction);
+        partnersByPositionId[partnerCount] = Partner(
             partnerCount,
-            _wallet_address,
+            msg.sender,
             _ebr_code,
             _placement_id,
             _balance
@@ -35,12 +92,12 @@ contract gen {
         partnerCount++;
     }
 
-    function getPartner(uint256 _partnerId)
+    function getPartner(uint256 _postion_id)
         public
         view
         returns (Partner memory)
     {
-        return partners[_partnerId];
+        return partnersByPositionId[_partnerId];
     }
 
     function getPartners()
@@ -70,11 +127,6 @@ contract gen {
         return (id, wallet_address, ebr_code, placement_id, balance);
     }
 
-    function latest_user_index() public view returns (uint256) {
-        uint256 last_index = partners.length - 1;
-        return last_index;
-    }
-
 //     function get_childs(uint256 _number)
 //         public
 //         view
@@ -96,4 +148,4 @@ contract gen {
 //         right_child = (_number * 2) + 2;
 //         return (left_child, right_child);
 //     }
-// }
+}

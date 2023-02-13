@@ -10,95 +10,128 @@ contract Genealogy {
         uint256 balance;
         uint256 created_at;
         uint256 last_update;
+        bool isValue;
     }
 
     mapping(uint256 => Partner) public partnersByPositionId;
-    mapping(string => Partner) public  partnersByWalletAddress;
+    mapping(address => Partner) public partnersByWalletAddress;
     mapping(string => Partner) public partnersByEbrCode;
-    uint[] public childs;
+    mapping(uint256 => Partner) public balancesByPositionId;
+    uint256 public left_child;
+    uint256 public sub_child_numbers;
+    uint256 public sub_child;
+    uint256 public position_id_from_ebr_code;
+    uint256[] public childs;
     uint256 public partnerCount;
 
     constructor() {
         partnerCount = 0;
     }
 
-    function isValidEbrCode(uint256 _ebr_code) public {
-        if (partnersByEbrCode[_ebr_code]){
+    function isValidEbrCode(string memory _ebr_code)
+        public
+        view
+        returns (bool)
+    {
+        if (partnersByEbrCode[_ebr_code].isValue) {
             return true;
-        }
-        else{
+        } else {
             return false;
         }
     }
 
-    function isValidPositionId(uint256 _position_id) public {
-        if (partnersByPositionId[_position_id]){
+    function isValidPositionId(uint256 _position_id)
+        public
+        view
+        returns (bool)
+    {
+        if (partnersByPositionId[_position_id].isValue) {
             return true;
-        }
-        else{
+        } else {
             return false;
         }
     }
 
-    function isValidDirection(string _direction) public {
-        if (_direction=='r' | _direction == 'l'){
+    function isValidDirection(string memory _direction)
+        public
+        view
+        returns (bool)
+    {
+        if (
+            keccak256(abi.encodePacked(_direction)) ==
+            keccak256(abi.encodePacked("l")) ||
+            keccak256(abi.encodePacked(_direction)) ==
+            keccak256(abi.encodePacked("r"))
+        ) {
             return true;
-        }
-        else{
+        } else {
             return false;
         }
     }
 
-    function generatePositionId(uint256 _upline_postion_id,string _direction) public {
-        if (isValidDirection(_direction)){
-            if (isValidPositionId(_upline_postion_id)==true){
-                if (_direction == 'r'){
-                    return _upline_postion_id*2+2;
-                }
-                else{
-                    return _upline_postion_id*2+1;
-                }
-            }
-            else{
-                return "invalid upline position_id";
-            }
-        }
-        else{
-            return "invalid direction passed. direction should be r or l (r for right and l for left)";
+    function generatePositionId(
+        uint256 _upline_postion_id,
+        string memory _direction
+    ) public view returns (uint256) {
+        require(
+            isValidDirection(_direction) == true,
+            "invalid upline position_id"
+        );
+        require(
+            isValidPositionId(_upline_postion_id) == true,
+            "invalid direction passed. direction should be r or l (r for right and l for left)"
+        );
+        if (
+            keccak256(abi.encodePacked(_direction)) ==
+            keccak256(abi.encodePacked("r"))
+        ) {
+            return _upline_postion_id * 2 + 2;
+        } else {
+            return _upline_postion_id * 2 + 1;
         }
     }
 
-    function getPositionIdFromEbrCode(uint256 _ebr_code)public{
-        if (isValidEbrCode(_ebr_code)){
-            partner = partnersByEbrCode[_ebr_code];
-            return partner.position_id;
+    function getPositionIdFromEbrCode(string memory _ebr_code)
+        public
+        returns (uint256)
+    {
+        if (isValidEbrCode(_ebr_code) == true) {
+            Partner storage partner = partnersByEbrCode[_ebr_code];
+            position_id_from_ebr_code = partner.position_id;
+            return position_id_from_ebr_code;
         }
     }
 
     function addPartner(
-        string storage _ebr_code,
-        string storage _direction,
-        string storage _upline_ebr_code,
-        uint256 storage _balance
+        string memory _ebr_code,
+        string memory _direction,
+        string memory _upline_ebr_code,
+        uint256 _balance
     ) public {
         uint256 upline_position_id = getPositionIdFromEbrCode(_upline_ebr_code);
-        uint256 new_position_id = generatePositionId(_upline_postion_id, _direction);
-        partnersByPositionId[partnerCount] = Partner(
-            partnerCount,
+        uint256 new_position_id = generatePositionId(
+            upline_position_id,
+            _direction
+        );
+        partnersByPositionId[new_position_id] = Partner(
+            new_position_id,
             msg.sender,
             _ebr_code,
-            _placement_id,
-            _balance
+            _direction,
+            _balance,
+            12,
+            21,
+            true
         );
         partnerCount++;
     }
 
-    function getPartner(uint256 _postion_id)
+    function getPartner(uint256 _position_id)
         public
         view
         returns (Partner memory)
     {
-        return partnersByPositionId[_partnerId];
+        return partnersByPositionId[_position_id];
     }
 
     function getPartners()
@@ -115,34 +148,49 @@ contract Genealogy {
         uint256[] memory id = new uint256[](partnerCount);
         address[] memory wallet_address = new address[](partnerCount);
         string[] memory ebr_code = new string[](partnerCount);
-        string[] memory placement_id = new string[](partnerCount);
+        string[] memory direction = new string[](partnerCount);
         uint256[] memory balance = new uint256[](partnerCount);
         for (uint256 i = 0; i < partnerCount; i++) {
-            Partner storage partner = partners[i];
-            id[i] = partner.id;
+            Partner storage partner = partnersByPositionId[i];
+            id[i] = partner.position_id;
             wallet_address[i] = partner.wallet_addres;
             ebr_code[i] = partner.ebr_code;
-            placement_id[i] = partner.placement_id;
+            direction[i] = partner.direction;
             balance[i] = partner.balance;
         }
-        return (id, wallet_address, ebr_code, placement_id, balance);
+        return (id, wallet_address, ebr_code, direction, balance);
     }
 
-    function calc_next_child(uint256 _number) public view returns(uint256) {
-        left_child = _number * 2 + 1
-        return left_child
+    function calc_next_child(uint256 _number) public returns (uint256) {
+        left_child = _number * 2 + 1;
+        return left_child;
     }
-    
-    function calc_childs(uint256 _number, uint256 _level) public view returns(uint256 []) {
+
+    function calc_childs(uint256 _number, uint256 _level)
+        public
+        returns (uint256[] memory)
+    {
         for (uint256 i = 1; i <= _level; i++) {
             left_child = calc_next_child(_number);
             sub_child_numbers = 2 ^ i;
             for (uint256 j = 0; j < sub_child_numbers; j++) {
                 sub_child = left_child + j;
                 childs.push(sub_child);
-            _number = left_child;
+                _number = left_child;
             }
         }
         return childs;
     }
+
+    // function get_last_partner_index() public view returns(uint256) {
+
+    // }
+
+    // function get_all_balances() public view returns (uint256[] memory) {
+    //     for (uint256 i = 0; i < partnerCount; i++) {
+    //         Partner storage partner = partnersByPositionId[i];
+    //         balancesByPositionId[i] = partner.balance;
+    //         return balancesByPositionId;
+    //     }
+    // }
 }

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+
 contract Genealogy {
     struct Partner {
         uint256 position_id;
@@ -18,21 +19,20 @@ contract Genealogy {
     mapping(address => Partner) public partnersByWalletAddress;
     mapping(string => Partner) public partnersByEbrCode;
     mapping(uint256 => Partner) public balancesByPositionId;
-    uint256 public left_child;
-    uint256 public sub_child_numbers;
-    uint256 public sub_child;
-    uint256 public position_id_from_ebr_code;
-    uint256[] public childs;
-    uint256 public partnerCount;
-    uint256[] public position_ids;
-    string public admin;
-    string public none;
-    uint256 public upline_position_id;
-    uint256 public new_position_id;
+    uint256 left_child;
+    uint256 sub_child_numbers;
+    uint256 sub_child;
+    uint256 position_id_from_ebr_code;
+    uint256[] childs;
+    uint256 partnerCount;
+    uint256[] position_ids;
+    uint256 upline_position_id;
+    uint256 new_position_id;
 
-    constructor() {
+    constructor(string memory _admin_ebr_code) payable {
         partnerCount = 0;
-        addPartner(admin, none, none, 100);
+        // string memory admin_ebr_code = Strings.toString(_admin_ebr_code);
+        addPartner(_admin_ebr_code, "none", "none", 100);
     }
 
     function isValidEbrCode(string memory _ebr_code)
@@ -115,24 +115,14 @@ contract Genealogy {
         string memory _upline_ebr_code,
         uint256 _balance
     ) public returns (uint256[] memory) {
-        partnersByEbrCode[_ebr_code] = Partner(
-            new_position_id,
-            upline_position_id,
-            msg.sender,
-            _ebr_code,
-            _direction,
-            _balance,
-            12,
-            21,
-            true
-        );
         if (
             keccak256(abi.encodePacked(_upline_ebr_code)) ==
-            keccak256(abi.encodePacked(none))
+            keccak256(abi.encodePacked("none"))
         ) {
             upline_position_id = 0;
-            new_position_id = 1;
-        } else {
+            new_position_id = 0;
+        }
+        else {
             uint256 upline_position_id = getPositionIdFromEbrCode(
                 _upline_ebr_code
             );
@@ -142,18 +132,21 @@ contract Genealogy {
             );
         }
 
-        position_ids.push(new_position_id); // storing all position ids
-        partnersByPositionId[new_position_id] = Partner(
+        Partner memory partner = Partner(
             new_position_id,
             upline_position_id,
             msg.sender,
             _ebr_code,
             _direction,
             _balance,
-            12,
-            21,
+            block.timestamp,
+            block.timestamp,
             true
         );
+        partnersByEbrCode[_ebr_code] = partner;
+        position_ids.push(new_position_id); // storing all position ids
+        partnersByPositionId[new_position_id] = partner;
+        partnersByWalletAddress[msg.sender]=partner;
         partnerCount++;
     }
 

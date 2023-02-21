@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
-import "@openzeppelin/contracts/utils/Strings.sol";
+
 
 contract Genealogy {
     struct Partner {
@@ -27,8 +27,8 @@ contract Genealogy {
     // uint256[] childs;
     uint256 partnerCount;
     uint256[] position_ids;
-    uint256 upline_position_id;
-    uint256 new_position_id;
+    uint256 _upline_position_id;
+    uint256 _new_position_id;
 
     constructor(string memory _admin_ebr_code) payable {
         partnerCount = 0;
@@ -131,22 +131,24 @@ contract Genealogy {
     function generatePositionId(
         uint256 _upline_postion_id,
         string memory _direction
-    ) public view returns (uint256) {
+    ) public returns (uint256) {
         require(
             isValidDirection(_direction) == true,
-            "invalid upline position_id"
+            "invalid direction passed. direction should be r or l (r for right and l for left)"
         );
         require(
             isValidPositionId(_upline_postion_id) == true,
-            "invalid direction passed. direction should be r or l (r for right and l for left)"
+            "invalid upline position_id"
         );
         if (
             keccak256(abi.encodePacked(_direction)) ==
             keccak256(abi.encodePacked("r"))
         ) {
-            return _upline_postion_id * 2 + 2;
+            _new_position_id = _upline_postion_id * 2 + 2;
+            return (_new_position_id);
         } else {
-            return _upline_postion_id * 2 + 1;
+            _new_position_id = _upline_postion_id * 2 + 1;
+            return (_new_position_id);
         }
     }
 
@@ -190,7 +192,9 @@ contract Genealogy {
             new_position_id = 0;
         }
         else {
-            uint256 upline_position_id = stringToUint(getPositionIdFromEbrCode(_upline_ebr_code));
+            uint256 upline_position_id = getPositionIdFromEbrCode(
+                _upline_ebr_code
+            );
             uint256 new_position_id = generatePositionId(
                 upline_position_id,
                 _direction
@@ -198,8 +202,8 @@ contract Genealogy {
         }
 
         Partner memory partner = Partner(
-            new_position_id,
-            upline_position_id,
+            _new_position_id,
+            _upline_position_id,
             msg.sender,
             _ebr_code,
             _direction,
@@ -209,9 +213,9 @@ contract Genealogy {
             true
         );
         partnersByEbrCode[_ebr_code] = partner;
-        position_ids.push(new_position_id); // storing all position ids
-        partnersByPositionId[new_position_id] = partner;
-        partnersByWalletAddress[msg.sender]=partner;
+        position_ids.push(_new_position_id); // storing all position ids
+        partnersByPositionId[_new_position_id] = partner;
+        partnersByWalletAddress[msg.sender] = partner;
         partnerCount++;
     }
 

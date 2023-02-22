@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
-
+import "@openzeppelin/contracts/utils/Strings.sol";
 
 contract Genealogy {
     struct Partner {
@@ -14,21 +14,21 @@ contract Genealogy {
         uint256 last_update;
         bool isValue;
     }
-
-    mapping(uint256 => Partner) public partnersByPositionId;
-    mapping(address => Partner) public partnersByWalletAddress;
-    mapping(string => Partner) public partnersByEbrCode;
-    mapping(uint256 => Partner) public balancesByPositionId;
+    mapping(uint256 => Partner) partnersByPositionId;
+    mapping(address => Partner) partnersByWalletAddress;
+    mapping(string => Partner) partnersByEbrCode;
+    mapping(address => string[]) invitationLinksByreferallWalletAdress;
+    mapping(address => string[]) invitationEbrPartnersByreferallWalletAddress;
     string[] refferalCodes;
     uint256 left_child;
     uint256 sub_child_numbers;
     uint256 sub_child;
     uint256 position_id_from_ebr_code;
-    // uint256[] childs;
+    mapping(string=>Partner) Childs;
     uint256 partnerCount;
     uint256[] position_ids;
-    uint256 _upline_position_id;
-    uint256 _new_position_id;
+    uint256 upline_position_id;
+    uint256 new_position_id;
 
     constructor(string memory _admin_ebr_code) payable {
         partnerCount = 0;
@@ -62,7 +62,7 @@ contract Genealogy {
 
     function isValidDirection(string memory _direction)
         public
-        view
+        pure
         returns (bool)
     {
         if (
@@ -77,24 +77,6 @@ contract Genealogy {
         }
     }
     
-    
-    // function random(uint number) public view returns(uint){
-    //     return uint(keccak256(abi.encodePacked(block.timestamp,block.difficulty,  
-    //     msg.sender))) % number;
-    // }
-
-    // function generateEbrCode() public view returns (string memory){
-    //     bytes memory randomWord=new bytes(8);
-    //     bytes memory chars = new bytes(26);
-    //     chars="abcdefghijklmnopqrstuvwxyz";
-    //     for (uint i=0;i<8;i++){
-    //         uint randomNumber=random(26);
-    //         // Index access for string is not possible
-    //         randomWord[i]=chars[randomNumber];
-    //     }
-    //     return string(randomWord);
-    // }
-
     function IsValidEbrCode(string memory _ebr_code) internal view returns(bool){
         if (partnersByEbrCode[_ebr_code].isValue){
             return true;
@@ -112,26 +94,47 @@ contract Genealogy {
         refferalCodes.push(_refferalCode);
     }
 
-    function createRefferalCode(string memory _invitation_ebr_code,uint _position_id) public view returns(string memory){
-        uint256 _upline = 0;
-        require(IsValidEbrCode(_invitation_ebr_code)==true,"invalid ebr code!");
-        if (_position_id/2==0){
-            uint _upline = (_position_id/2) -2;
+    function addInvitaionLinksByWalletAddress(string memory _refferalLink)internal{
+        invitationLinksByreferallWalletAdress[msg.sender].push(_refferalLink);
+    }
+
+    function addInvitationEbrCodesByWalletAddress(string memory _invitation_code)internal{
+        invitationEbrPartnersByreferallWalletAddress[msg.sender].push(_invitation_code);
+    }
+
+    function isValidWalletAddress() public view returns(bool){
+        address sender = msg.sender;
+        if (partnersByWalletAddress[sender].isValue==true){
+            return true;
         }
         else{
-            uint _upline = (_position_id/2)-1;
+            return false;
         }
-        require(isValidPositionId(_upline)==true,"invalid position id.Are you sure that has upline?");
+    }
+
+    function myInvitationLinks()public view returns(string[] memory){
+        return invitationLinksByreferallWalletAdress[msg.sender];
+    }
+
+    function myInvitationEbrsPartner()public view returns(string[] memory){
+        return invitationEbrPartnersByreferallWalletAddress[msg.sender];
+    }
+
+    function createRefferalCode(string memory _invitation_ebr_code,uint _position_id) public returns(string memory){
+        require(IsValidEbrCode(_invitation_ebr_code)==false,"duplicate ebr code!");
+        uint256 _upline = calcUplineFromPositionId(_position_id);
+        require(isValidPositionId(_upline),"invalid position id.Are you sure that has upline?");
         Partner memory refferal_partner = partnersByWalletAddress[msg.sender];
         string memory refferalCode = createReffralString(_invitation_ebr_code,refferal_partner.ebr_code,_position_id);
-        
+        addInvitaionLinksByWalletAddress(refferalCode);
+        addInvitationEbrCodesByWalletAddress(_invitation_ebr_code);
         return refferalCode;
     }
 
     function generatePositionId(
         uint256 _upline_postion_id,
         string memory _direction
-    ) public returns (uint256) {
+    ) public view returns (uint256) {
         require(
             isValidDirection(_direction) == true,
             "invalid direction passed. direction should be r or l (r for right and l for left)"
@@ -144,11 +147,9 @@ contract Genealogy {
             keccak256(abi.encodePacked(_direction)) ==
             keccak256(abi.encodePacked("r"))
         ) {
-            _new_position_id = _upline_postion_id * 2 + 2;
-            return (_new_position_id);
+            return _upline_postion_id * 2 + 2;
         } else {
-            _new_position_id = _upline_postion_id * 2 + 1;
-            return (_new_position_id);
+            return _upline_postion_id * 2 + 1;
         }
     }
 
@@ -192,9 +193,7 @@ contract Genealogy {
             new_position_id = 0;
         }
         else {
-            uint256 upline_position_id = getPositionIdFromEbrCode(
-                _upline_ebr_code
-            );
+            uint256 upline_position_id = stringToUint(getPositionIdFromEbrCode(_upline_ebr_code));
             uint256 new_position_id = generatePositionId(
                 upline_position_id,
                 _direction
@@ -202,8 +201,8 @@ contract Genealogy {
         }
 
         Partner memory partner = Partner(
-            _new_position_id,
-            _upline_position_id,
+            new_position_id,
+            upline_position_id,
             msg.sender,
             _ebr_code,
             _direction,
@@ -213,9 +212,9 @@ contract Genealogy {
             true
         );
         partnersByEbrCode[_ebr_code] = partner;
-        position_ids.push(_new_position_id); // storing all position ids
-        partnersByPositionId[_new_position_id] = partner;
-        partnersByWalletAddress[msg.sender] = partner;
+        position_ids.push(new_position_id); // storing all position ids
+        partnersByPositionId[new_position_id] = partner;
+        partnersByWalletAddress[msg.sender]=partner;
         partnerCount++;
     }
 
@@ -232,6 +231,7 @@ contract Genealogy {
         view
         returns (Partner memory)
     {
+        require(isValidPositionId(_position_id),"invalid position id");
         return partnersByPositionId[_position_id];
     }
 
@@ -252,7 +252,7 @@ contract Genealogy {
         string[] memory direction = new string[](partnerCount);
         uint256[] memory balance = new uint256[](partnerCount);
         for (uint256 i = 0; i < partnerCount; i++) {
-            Partner storage partner = partnersByPositionId[i];
+            Partner memory partner = partnersByPositionId[i];
             id[i] = partner.position_id;
             wallet_address[i] = partner.wallet_addres;
             ebr_code[i] = partner.ebr_code;
@@ -262,16 +262,13 @@ contract Genealogy {
         return (id, wallet_address, ebr_code, direction, balance);
     }
 
-    function calcNextChilds(uint256 _position_id) public view returns (uint256) {
+    function calcNextChilds(uint256 _position_id) public pure returns(uint256,uint256){
         uint256 left_child_position = _position_id * 2 + 1;
         uint256 right_child_position = _position_id * 2 + 2;
-        string=>Partner new Childs;
-        Childs["left_child"]=partnersByPositionId[left_child_position];
-        Childs["right_child"]=partnersByPositionId[right_child_position];
-        return Childs;
+        return (left_child_position,right_child_position);
     }
 
-    function calcUplineFromPositionId(uint256 _position_id) public view returns (uint256){
+    function calcUplineFromPositionId(uint256 _position_id) public pure returns (uint256){
         if (_position_id%2==0){
             return (_position_id-2)/2;
         }
@@ -280,34 +277,9 @@ contract Genealogy {
         }
     }
 
-    // function calc_childs(uint256 _number, uint256 _level)
-    //     public
-    //     returns (uint256[] memory)
-    // {
-    //     uint256[] memory childs = new uint256[];
-    //     for (uint256 i = 1; i <= _level; i++) {
-    //         left_child = calc_next_child(_number);
-    //         sub_child_numbers = 2 ^ i;
-    //         for (uint256 j = 0; j < sub_child_numbers; j++) {
-    //             sub_child = left_child + j;
-    //             childs.push(sub_child);
-    //             _number = left_child;
-    //         }
-    //     }
-    //     return childs;
-    // }
-
-    // function
-
-    // function get_last_partner_index() public view returns(uint256) {
-
-    // }
-
-    // function get_all_balances() public view returns (uint256[] memory) {
-    //     for (uint256 i = 0; i < partnerCount; i++) {
-    //         Partner storage partner = partnersByPositionId[i];
-    //         balancesByPositionId[i] = partner.balance;
-    //         return balancesByPositionId;
-    //     }
-    // }
+    function getBalanceByPositionId(uint256 _position_id) public view returns (uint256){
+        Partner memory partner = partnersByPositionId[_position_id];
+        require(isValidPositionId(_position_id),"invalid position id");
+        return partner.balance;
+        }
 }

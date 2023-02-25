@@ -2,8 +2,10 @@
 pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "github.com/Arachnid/solidity-stringutils/blob/master/src/strings.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
-contract Genealogy {
+contract Genealogy is Ownable, ReentrancyGuard {
     using strings for *;
     struct Partner {
         uint256 position_id;
@@ -215,7 +217,8 @@ contract Genealogy {
             "this position is already filled"
         );
         uint256 upline_position_id = calcUplineFromPositionId(position_id);
-        string memory upline_ebr_code = partnersByPositionId[upline_position_id].ebr_code;
+        string memory upline_ebr_code = partnersByPositionId[upline_position_id]
+            .ebr_code;
         if (position_id % 2 == 0) {
             string memory direction = "r";
         } else {
@@ -264,7 +267,8 @@ contract Genealogy {
     }
 
     function getPositionIdFromEbrCode(string memory _ebr_code)
-        public //onlyOwner
+        public
+        onlyOwner
         returns (string memory)
     {
         if (isValidEbrCode(_ebr_code) == true) {
@@ -337,8 +341,9 @@ contract Genealogy {
     }
 
     function getPartner(uint256 _position_id)
-        internal //onlyOwner
+        public
         view
+        onlyOwner
         returns (Partner memory)
     {
         require(isValidPositionId(_position_id), "invalid position id");
@@ -362,7 +367,7 @@ contract Genealogy {
         string[] memory direction = new string[](partnerCount);
         uint256[] memory balance = new uint256[](partnerCount);
         for (uint256 i = 0; i < position_ids.length; i++) {
-            uint j = position_ids[i];
+            uint256 j = position_ids[i];
             Partner memory partner = partnersByPositionId[j];
             id[i] = partner.position_id;
             wallet_address[i] = partner.wallet_addres;
@@ -396,8 +401,9 @@ contract Genealogy {
     }
 
     function getBalanceByPositionId(uint256 _position_id)
-        public //onlyOwner
+        public
         view
+        onlyOwner
         returns (uint256)
     {
         Partner memory partner = partnersByPositionId[_position_id];

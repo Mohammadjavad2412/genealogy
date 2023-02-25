@@ -16,12 +16,12 @@ contract Genealogy {
         uint256 last_update;
         bool isValue;
     }
-    mapping(uint256 => Partner) public partnersByPositionId;
+    mapping(uint256 => Partner) partnersByPositionId;
     mapping(address => Partner) partnersByWalletAddress;
     mapping(string => Partner) partnersByEbrCode;
     mapping(address => string[]) invitationLinksByreferallWalletAdress;
     mapping(address => string[]) invitationEbrPartnersByreferallWalletAddress;
-    string[] public refferalCodes;
+    string[] refferalCodes;
     uint256 left_child;
     uint256 sub_child_numbers;
     uint256 sub_child;
@@ -39,7 +39,7 @@ contract Genealogy {
     }
 
     function isValidEbrCode(string memory _ebr_code)
-        public
+        internal
         view
         returns (bool)
     {
@@ -51,7 +51,7 @@ contract Genealogy {
     }
 
     function isValidPositionId(uint256 _position_id)
-        public
+        internal
         view
         returns (bool)
     {
@@ -63,7 +63,7 @@ contract Genealogy {
     }
 
     function isValidDirection(string memory _direction)
-        public
+        internal
         pure
         returns (bool)
     {
@@ -109,7 +109,7 @@ contract Genealogy {
             );
     }
 
-    function addRefferalCode(string memory _refferalCode) public {
+    function addRefferalCode(string memory _refferalCode) internal {
         refferalCodes.push(_refferalCode);
     }
 
@@ -191,10 +191,9 @@ contract Genealogy {
 
     function addPartnerFromLink(string memory _invitation_link)
         public
-        payable
         returns (string memory result)
     {
-        string memory direction = "l";
+        string memory direction;
         string memory invitation_link = _invitation_link;
         require(isValidWalletAddress() == false, "you had position.");
         require(
@@ -216,21 +215,36 @@ contract Genealogy {
             "this position is already filled"
         );
         uint256 upline_position_id = calcUplineFromPositionId(position_id);
-        string memory upline_ebr_code = partnersByPositionId[upline_position_id]
-            .ebr_code;
+        string memory upline_ebr_code = partnersByPositionId[upline_position_id].ebr_code;
         if (position_id % 2 == 0) {
             string memory direction = "r";
         } else {
             string memory direction = "l";
         }
-        this.addPartner(invited_ebr_code, direction, upline_ebr_code, 0);
+
+        Partner memory partner = Partner(
+            position_id,
+            upline_position_id,
+            msg.sender,
+            invited_ebr_code,
+            direction,
+            1,
+            block.timestamp,
+            block.timestamp,
+            true
+        );
+        partnersByEbrCode[invited_ebr_code] = partner;
+        position_ids.push(position_id);
+        partnersByPositionId[position_id] = partner;
+        partnersByWalletAddress[msg.sender] = partner;
+        partnerCount++;
         return "successfully add partner";
     }
 
     function generatePositionId(
         uint256 _upline_postion_id,
         string memory _direction
-    ) public view returns (uint256) {
+    ) internal returns (uint256) {
         require(
             isValidDirection(_direction) == true,
             "invalid direction passed. direction should be r or l (r for right and l for left)"
@@ -250,7 +264,7 @@ contract Genealogy {
     }
 
     function getPositionIdFromEbrCode(string memory _ebr_code)
-        public
+        public //onlyOwner
         returns (string memory)
     {
         if (isValidEbrCode(_ebr_code) == true) {
@@ -279,7 +293,7 @@ contract Genealogy {
         string memory _direction,
         string memory _upline_ebr_code,
         uint256 _balance
-    ) public returns (uint256[] memory) {
+    ) internal returns (uint256[] memory) {
         if (
             keccak256(abi.encodePacked(_upline_ebr_code)) ==
             keccak256(abi.encodePacked("none"))
@@ -314,16 +328,16 @@ contract Genealogy {
         partnerCount++;
     }
 
-    function getPositionIdList() public view returns (uint256[] memory) {
+    function getPositionIdList() internal view returns (uint256[] memory) {
         return position_ids;
     }
 
-    function countPositionIds() public view returns (uint256) {
+    function countPositionIds() internal view returns (uint256) {
         return position_ids.length;
     }
 
     function getPartner(uint256 _position_id)
-        public
+        internal //onlyOwner
         view
         returns (Partner memory)
     {
@@ -332,7 +346,7 @@ contract Genealogy {
     }
 
     function getPartners()
-        public
+        internal
         view
         returns (
             uint256[] memory,
@@ -347,8 +361,9 @@ contract Genealogy {
         string[] memory ebr_code = new string[](partnerCount);
         string[] memory direction = new string[](partnerCount);
         uint256[] memory balance = new uint256[](partnerCount);
-        for (uint256 i = 0; i < partnerCount; i++) {
-            Partner memory partner = partnersByPositionId[i];
+        for (uint256 i = 0; i < position_ids.length; i++) {
+            uint j = position_ids[i];
+            Partner memory partner = partnersByPositionId[j];
             id[i] = partner.position_id;
             wallet_address[i] = partner.wallet_addres;
             ebr_code[i] = partner.ebr_code;
@@ -381,7 +396,7 @@ contract Genealogy {
     }
 
     function getBalanceByPositionId(uint256 _position_id)
-        public
+        public //onlyOwner
         view
         returns (uint256)
     {

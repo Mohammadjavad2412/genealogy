@@ -45,7 +45,7 @@ contract Genealogy is Ownable, ReentrancyGuard {
         partnerCount = 0;
         // string memory admin_ebr_code = Strings.toString(_admin_ebr_code);
         addPartner(_admin_ebr_code, "none", "none", 100);
-        StakingInterface StakingContract = StakingInterface(
+        StakingContract = StakingInterface(
             stakeContractAddress
         );
     }
@@ -421,7 +421,9 @@ contract Genealogy is Ownable, ReentrancyGuard {
         return partner.balance;
     }
 
-    function userIsStaker() public returns (bool) {
-        return StakingContract.IsStaker();
+    function userIsStaker() public payable returns (bool) {
+        bool result;
+        result = StakingContract.IsStaker();
+        return result;
     }
 }

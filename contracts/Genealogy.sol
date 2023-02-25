@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/utils/Strings.sol";
+import "github.com/Arachnid/solidity-stringutils/blob/master/src/strings.sol";
+
 
 contract Genealogy {
+    using strings for *;
     struct Partner {
         uint256 position_id;
         uint256 upline_position_id;
@@ -120,15 +123,54 @@ contract Genealogy {
         return invitationEbrPartnersByreferallWalletAddress[msg.sender];
     }
 
+    function isValidInvitationLink(string memory _invitation_link) public view returns(bool){
+        for (uint i=0;i<refferalCodes.length;i++){
+            if (keccak256(abi.encodePacked(refferalCodes[i]))==keccak256(abi.encodePacked(_invitation_link))){
+                return true;
+            }
+        }
+        return false;
+    }
+
     function createRefferalCode(string memory _invitation_ebr_code,uint _position_id) public returns(string memory){
         require(IsValidEbrCode(_invitation_ebr_code)==false,"duplicate ebr code!");
         uint256 _upline = calcUplineFromPositionId(_position_id);
         require(isValidPositionId(_upline),"invalid position id.Are you sure that has upline?");
+        require(isValidPositionId(_position_id)==false,"this position is already filled!");
         Partner memory refferal_partner = partnersByWalletAddress[msg.sender];
         string memory refferalCode = createReffralString(_invitation_ebr_code,refferal_partner.ebr_code,_position_id);
         addInvitaionLinksByWalletAddress(refferalCode);
         addInvitationEbrCodesByWalletAddress(_invitation_ebr_code);
+        refferalCodes.push(refferalCode);
         return refferalCode;
+    }
+
+    function addPartnerFromLink(string memory _invitation_link) public returns(string memory result){
+        string memory direction = 'l';
+        string memory invitation_link = _invitation_link;
+        require(isValidWalletAddress()==false,"you had position.");
+        require(isValidInvitationLink(invitation_link),"invalid invitation link");
+        strings.slice memory s = invitation_link.toSlice();                
+        strings.slice memory delim = "-".toSlice();                            
+        string[] memory parts = new string[](s.count(delim));                  
+        for (uint i = 0; i < parts.length; i++) {                              
+           parts[i] = s.split(delim).toString();                               
+        }                                        
+        require(parts.length==3,"invalid ebr code");
+        string memory invited_ebr_code = parts[0];
+        string memory refferal_ebr_code = parts[1];
+        uint256 position_id = stringToUint(parts[2]);
+        require(isValidPositionId(position_id)==false,"this position is already filled");
+        uint256 upline_position_id = calcUplineFromPositionId(position_id);
+        string memory  upline_ebr_code = partnersByPositionId[upline_position_id].ebr_code;
+        if (position_id%2==0){
+            string memory direction = 'r';
+        }
+        else{
+            string memory direction = 'l';
+        }
+        this.addPartner(invited_ebr_code,direction,upline_ebr_code,0);
+        return "successfully add partner";
     }
 
     function generatePositionId(
@@ -167,7 +209,7 @@ contract Genealogy {
         }
     }
 
-    function stringToUint(string memory s) public pure returns (uint) {
+    function stringToUint(string memory s) internal pure returns (uint) {
         bytes memory b = bytes(s);
         uint result = 0;
         for (uint256 i = 0; i < b.length; i++) {

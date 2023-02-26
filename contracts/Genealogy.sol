@@ -37,11 +37,9 @@ contract Genealogy is Ownable, ReentrancyGuard {
     string public status;
     event Log(bool msg);
 
-    constructor(string memory _admin_ebr_code, address stakeContractAddress)
-        payable
-    {
+    constructor(string memory _admin_ebr_code, address stakeContractAddress) payable {
         partnerCount = 0;
-        addPartner(_admin_ebr_code, "none", "none", 100);
+        // addPartner(_admin_ebr_code, "none", "none");
         StakingContract = stakeContractAddress;
     }
 
@@ -200,6 +198,7 @@ contract Genealogy is Ownable, ReentrancyGuard {
         public
         returns (string memory result)
     {
+        require(userIsStaker(),"you should stake first!");
         string memory direction;
         string memory invitation_link = _invitation_link;
         require(isValidWalletAddress() == false, "you had position.");
@@ -213,30 +212,27 @@ contract Genealogy is Ownable, ReentrancyGuard {
         for (uint256 i = 0; i < parts.length; i++) {
             parts[i] = s.split(delim).toString();
         }
-        // require(parts.length==3,"invalid ebr code");
         string memory invited_ebr_code = parts[0];
-        string memory refferal_ebr_code = parts[1];
         uint256 position_id = stringToUint(parts[2]);
         require(
             isValidPositionId(position_id) == false,
             "this position is already filled"
         );
         uint256 upline_position_id = calcUplineFromPositionId(position_id);
-        string memory upline_ebr_code = partnersByPositionId[upline_position_id]
-            .ebr_code;
+        string memory upline_ebr_code = partnersByPositionId[upline_position_id].ebr_code;
         if (position_id % 2 == 0) {
             string memory direction = "r";
         } else {
             string memory direction = "l";
         }
-
+        uint256 balance = gatherStakingBalance();
         Partner memory partner = Partner(
             position_id,
             upline_position_id,
             msg.sender,
             invited_ebr_code,
             direction,
-            1,
+            balance,
             block.timestamp,
             block.timestamp,
             true
@@ -252,7 +248,7 @@ contract Genealogy is Ownable, ReentrancyGuard {
     function generatePositionId(
         uint256 _upline_postion_id,
         string memory _direction
-    ) internal returns (uint256) {
+    ) internal view returns (uint256) {
         require(
             isValidDirection(_direction) == true,
             "invalid direction passed. direction should be r or l (r for right and l for left)"
@@ -300,9 +296,9 @@ contract Genealogy is Ownable, ReentrancyGuard {
     function addPartner(
         string memory _ebr_code,
         string memory _direction,
-        string memory _upline_ebr_code,
-        uint256 _balance
-    ) internal returns (uint256[] memory) {
+        string memory _upline_ebr_code
+    ) internal{
+        require(userIsStaker()==true,"you should stake first");
         if (
             keccak256(abi.encodePacked(_upline_ebr_code)) ==
             keccak256(abi.encodePacked("none"))
@@ -318,7 +314,7 @@ contract Genealogy is Ownable, ReentrancyGuard {
                 _direction
             );
         }
-
+        uint256 _balance = gatherStakingBalance();
         Partner memory partner = Partner(
             new_position_id,
             upline_position_id,
@@ -416,14 +412,20 @@ contract Genealogy is Ownable, ReentrancyGuard {
         return partner.balance;
     }
 
-    function userIsStaker() public returns (bool, bool) {
+    function userIsStaker() public returns (bool) {
         bytes memory payload = abi.encodeWithSignature(
             "isStakerByAddress(address)",
             msg.sender
         );
-        (bool success, bytes memory returnData) = StakingContract.call(payload);
+        (, bytes memory returnData) = StakingContract.call(payload);
         bool result = abi.decode(returnData, (bool));
-        emit Log(result);
-        return (success, result);
+        return result;
+    }
+
+    function gatherStakingBalance() public returns (uint256 balance){
+        bytes memory payload = abi.encodeWithSignature("BalanceOf(address)",msg.sender);
+        (, bytes memory returnData) = StakingContract.call(payload);
+        balance = abi.decode(returnData, (uint256));
+        return balance;
     }
 }

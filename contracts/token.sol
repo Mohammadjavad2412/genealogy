@@ -6,4 +6,4 @@ contract DappToken is ERC20("MLM Token", "MLM") {
     constructor() public {
         _mint(msg.sender, 1000000000000000000000000);
     }
-    
+}

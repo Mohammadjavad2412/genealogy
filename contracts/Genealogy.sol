@@ -34,6 +34,8 @@ contract Genealogy is Ownable, ReentrancyGuard {
     uint256 upline_position_id;
     uint256 new_position_id;
     address StakingContract;
+    string public status;
+    event Log(bool msg);
 
     constructor(string memory _admin_ebr_code, address stakeContractAddress)
         payable
@@ -414,9 +416,14 @@ contract Genealogy is Ownable, ReentrancyGuard {
         return partner.balance;
     }
 
-    function userIsStaker() public returns (bytes memory) {
-        bytes memory payload = abi.encodeWithSignature("IsStaker()");
-        (bool  success, bytes memory returnData) = address(StakingContract).call(payload);
-        return returnData;
+    function userIsStaker() public returns (bool, bool) {
+        bytes memory payload = abi.encodeWithSignature(
+            "isStakerByAddress(address)",
+            msg.sender
+        );
+        (bool success, bytes memory returnData) = StakingContract.call(payload);
+        bool result = abi.decode(returnData, (bool));
+        emit Log(result);
+        return (success, result);
     }
 }

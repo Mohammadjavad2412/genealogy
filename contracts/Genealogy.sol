@@ -5,10 +5,6 @@ import "github.com/Arachnid/solidity-stringutils/blob/master/src/strings.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
-interface StakingInterface {
-    function IsStaker() external returns (bool);
-}
-
 contract Genealogy is Ownable, ReentrancyGuard {
     using strings for *;
     struct Partner {
@@ -37,17 +33,14 @@ contract Genealogy is Ownable, ReentrancyGuard {
     uint256[] position_ids;
     uint256 upline_position_id;
     uint256 new_position_id;
-    StakingInterface StakingContract;
+    address StakingContract;
 
     constructor(string memory _admin_ebr_code, address stakeContractAddress)
         payable
     {
         partnerCount = 0;
-        // string memory admin_ebr_code = Strings.toString(_admin_ebr_code);
         addPartner(_admin_ebr_code, "none", "none", 100);
-        StakingContract = StakingInterface(
-            stakeContractAddress
-        );
+        StakingContract = stakeContractAddress;
     }
 
     function isValidEbrCode(string memory _ebr_code)
@@ -421,9 +414,9 @@ contract Genealogy is Ownable, ReentrancyGuard {
         return partner.balance;
     }
 
-    function userIsStaker() public payable returns (bool) {
-        bool result;
-        result = StakingContract.IsStaker();
-        return result;
+    function userIsStaker() public returns (bytes memory) {
+        bytes memory payload = abi.encodeWithSignature("IsStaker()");
+        (bool  success, bytes memory returnData) = address(StakingContract).call(payload);
+        return returnData;
     }
 }

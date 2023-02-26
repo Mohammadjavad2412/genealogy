@@ -197,6 +197,11 @@ contract TokenFarm is Ownable, ReentrancyGuard {
         return balance;
     }
 
+    function BalanceOf(address _staker_address) public view returns (uint256 stakerBalance){
+        uint256 balance = InitialBalance[_staker_address];
+        return balance;
+    }
+
     //called when user wants to stake token.
 
     function stakeTokens(uint256 _amount) public {

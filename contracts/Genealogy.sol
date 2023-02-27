@@ -35,7 +35,6 @@ contract Genealogy is Ownable, ReentrancyGuard {
     uint256 new_position_id;
     address StakingContract;
     string public status;
-    event Log(bool msg);
 
     constructor(string memory _admin_ebr_code, address stakeContractAddress) payable {
         partnerCount = 0;
@@ -297,8 +296,8 @@ contract Genealogy is Ownable, ReentrancyGuard {
         string memory _ebr_code,
         string memory _direction,
         string memory _upline_ebr_code
-    ) internal{
-        require(userIsStaker()==true,"you should stake first");
+    ) public onlyOwner returns(string memory result){
+        require(userIsStaker(),"you should stake first");
         if (
             keccak256(abi.encodePacked(_upline_ebr_code)) ==
             keccak256(abi.encodePacked("none"))
@@ -331,6 +330,8 @@ contract Genealogy is Ownable, ReentrancyGuard {
         partnersByPositionId[new_position_id] = partner;
         partnersByWalletAddress[msg.sender] = partner;
         partnerCount++;
+        result = "success";
+        return result;
     }
 
     function getPositionIdList() internal view returns (uint256[] memory) {
@@ -412,20 +413,17 @@ contract Genealogy is Ownable, ReentrancyGuard {
         return partner.balance;
     }
 
-    function userIsStaker() public returns (bool) {
-        bytes memory payload = abi.encodeWithSignature(
-            "isStakerByAddress(address)",
-            msg.sender
-        );
-        (, bytes memory returnData) = StakingContract.call(payload);
+    function userIsStaker() public returns (bool result) {
+        bytes memory payload = abi.encodeWithSignature("isStakerByAddress(address)",msg.sender);
+        (bool success, bytes memory returnData) = StakingContract.call(payload);
         bool result = abi.decode(returnData, (bool));
         return result;
     }
 
-    function gatherStakingBalance() public returns (uint256 balance){
+    function gatherStakingBalance() public returns (uint256){
         bytes memory payload = abi.encodeWithSignature("BalanceOf(address)",msg.sender);
-        (, bytes memory returnData) = StakingContract.call(payload);
-        balance = abi.decode(returnData, (uint256));
+        (bool success, bytes memory returnData) = StakingContract.call(payload);
+        uint256 balance = abi.decode(returnData, (uint256));
         return balance;
     }
 }

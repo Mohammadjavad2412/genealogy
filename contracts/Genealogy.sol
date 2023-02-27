@@ -10,10 +10,12 @@ contract Genealogy is Ownable, ReentrancyGuard {
     struct Partner {
         uint256 position_id;
         uint256 upline_position_id;
-        address wallet_addres;
+        address wallet_address;
         string ebr_code;
         string direction; // left or right of the upline
         uint256 balance;
+        uint256 sum_left_balance;
+        uint256 sum_right_balance;
         uint256 created_at;
         uint256 last_update;
         bool isValue;
@@ -82,6 +84,15 @@ contract Genealogy is Ownable, ReentrancyGuard {
             return true;
         } else {
             return false;
+        }
+    }
+
+    function getDirectionByPositionId(uint256 _position_id) public view returns(string memory){
+        if (_position_id%2==0){
+            return "r";
+        }
+        else{
+            return "l";
         }
     }
 
@@ -235,6 +246,8 @@ contract Genealogy is Ownable, ReentrancyGuard {
             invited_ebr_code,
             direction,
             balance,
+            0,
+            0,
             block.timestamp,
             block.timestamp,
             true
@@ -324,6 +337,8 @@ contract Genealogy is Ownable, ReentrancyGuard {
             _ebr_code,
             _direction,
             _balance,
+            0,
+            0,
             block.timestamp,
             block.timestamp,
             true
@@ -376,7 +391,7 @@ contract Genealogy is Ownable, ReentrancyGuard {
             uint256 j = position_ids[i];
             Partner memory partner = partnersByPositionId[j];
             id[i] = partner.position_id;
-            wallet_address[i] = partner.wallet_addres;
+            wallet_address[i] = partner.wallet_address;
             ebr_code[i] = partner.ebr_code;
             direction[i] = partner.direction;
             balance[i] = partner.balance;
@@ -399,6 +414,9 @@ contract Genealogy is Ownable, ReentrancyGuard {
         pure
         returns (uint256)
     {
+        if (_position_id==1 || _position_id==0){
+            return 0;
+        }
         if (_position_id % 2 == 0) {
             return (_position_id - 2) / 2;
         } else {
@@ -478,8 +496,8 @@ contract Genealogy is Ownable, ReentrancyGuard {
         Partner memory right_partner = partnersByPositionId[
             right_child_position
         ];
-        address left_partner_wallet_address = left_partner.wallet_addres;
-        address right_partner_wallet_address = right_partner.wallet_addres;
+        address left_partner_wallet_address = left_partner.wallet_address;
+        address right_partner_wallet_address = right_partner.wallet_address;
         uint256 left_partner_staked_balance = stakingBalance(
             left_partner_wallet_address
         );
@@ -487,5 +505,40 @@ contract Genealogy is Ownable, ReentrancyGuard {
             right_partner_wallet_address
         );
         return (left_partner_staked_balance, right_partner_staked_balance);
+    }
+
+    function updatePartner(Partner memory partner)internal onlyOwner{
+        address wallet_address = partner.wallet_address;
+        uint256 position_id = partner.position_id;
+        string memory ebr_code = partner.ebr_code;
+        partnersByPositionId[position_id]=partner;
+        partnersByWalletAddress[wallet_address]=partner;
+        partnersByEbrCode[ebr_code]=partner;
+    }
+
+    function updateUplinesBalances(uint256 _position_id,uint256 amount)public onlyOwner{
+        require(isValidPositionId(),"invalid postion id");
+        bool not_done =true;
+        uint256 up_line_position_id = calcUplineFromPositionId(_position_id);
+        while (not_done){
+            Partner memory partner = partnersByPositionId[upline_position_id];
+            if (keccak256(abi.encodePacked(getDirectionByPositionId(_position_id)))==keccak256(abi.encodePacked("r"))){
+                uint256 old_balance = partner.sum_right_balance;
+                uint256 new_balance = old_balance + amount;
+                partner.sum_right_balance = new_balance;
+                updatePartner(partner);
+            }
+            else{
+                uint256 old_balance = partner.sum_left_balance;
+                uint256 new_balance = old_balance + amount;
+                partner.sum_left_balance = new_balance;
+                updatePartner(partner);
+            }
+            uint256 _position_id = upline_position_id;
+            uint256 upline_position_id = calcUplineFromPositionId(upline_position_id);
+            if (_position_id ==0 && upline_position_id == 0){
+                not_done = false;
+            }
+        }
     }
 }

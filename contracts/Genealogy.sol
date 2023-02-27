@@ -36,7 +36,9 @@ contract Genealogy is Ownable, ReentrancyGuard {
     address StakingContract;
     address[] walletAddresses;
 
-    constructor(string memory _admin_ebr_code, address stakeContractAddress) payable {
+    constructor(string memory _admin_ebr_code, address stakeContractAddress)
+        payable
+    {
         partnerCount = 0;
         // addPartner(_admin_ebr_code, "none", "none");
         StakingContract = stakeContractAddress;
@@ -197,7 +199,7 @@ contract Genealogy is Ownable, ReentrancyGuard {
         public
         returns (string memory result)
     {
-        require(userIsStaker(),"you should stake first!");
+        require(userIsStaker(), "you should stake first!");
         string memory direction;
         string memory invitation_link = _invitation_link;
         require(isValidWalletAddress() == false, "you had position.");
@@ -218,7 +220,8 @@ contract Genealogy is Ownable, ReentrancyGuard {
             "this position is already filled"
         );
         uint256 upline_position_id = calcUplineFromPositionId(position_id);
-        string memory upline_ebr_code = partnersByPositionId[upline_position_id].ebr_code;
+        string memory upline_ebr_code = partnersByPositionId[upline_position_id]
+            .ebr_code;
         if (position_id % 2 == 0) {
             string memory direction = "r";
         } else {
@@ -296,8 +299,8 @@ contract Genealogy is Ownable, ReentrancyGuard {
         string memory _ebr_code,
         string memory _direction,
         string memory _upline_ebr_code
-    ) public onlyOwner returns(string memory result){
-        require(userIsStaker(),"you should stake first");
+    ) public onlyOwner returns (string memory result) {
+        require(userIsStaker(), "you should stake first");
         if (
             keccak256(abi.encodePacked(_upline_ebr_code)) ==
             keccak256(abi.encodePacked("none"))
@@ -415,36 +418,74 @@ contract Genealogy is Ownable, ReentrancyGuard {
     }
 
     function userIsStaker() public returns (bool result) {
-        bytes memory payload = abi.encodeWithSignature("isStakerByAddress(address)",msg.sender);
+        bytes memory payload = abi.encodeWithSignature(
+            "isStakerByAddress(address)",
+            msg.sender
+        );
         (bool success, bytes memory returnData) = StakingContract.call(payload);
         bool result = abi.decode(returnData, (bool));
         return result;
     }
 
-    function stakingBalance(address)public onlyOwner returns(uint256){
-        bytes memory payload = abi.encodeWithSignature("BalanceOf(address)",msg.sender);
+    function stakingBalance(address _staker_addr)
+        public
+        onlyOwner
+        returns (uint256)
+    {
+        bytes memory payload = abi.encodeWithSignature(
+            "BalanceOf(address)",
+            _staker_addr
+        );
         (bool success, bytes memory returnData) = StakingContract.call(payload);
         uint256 balance = abi.decode(returnData, (uint256));
         return balance;
     }
 
-    function MyStakingBalance() public returns (uint256){
-        bytes memory payload = abi.encodeWithSignature("BalanceOf(address)",msg.sender);
+    function MyStakingBalance() public returns (uint256) {
+        bytes memory payload = abi.encodeWithSignature(
+            "BalanceOf(address)",
+            msg.sender
+        );
         (bool success, bytes memory returnData) = StakingContract.call(payload);
         uint256 balance = abi.decode(returnData, (uint256));
         return balance;
     }
 
-    function updateBalance(address _wallet_address)internal onlyOwner returns(uint256){
+    function updateBalance(address _wallet_address)
+        internal
+        onlyOwner
+        returns (uint256)
+    {
         Partner memory partner = partnersByWalletAddress[_wallet_address];
         uint256 new_balance = stakingBalance(_wallet_address);
         partner.balance = new_balance;
         return new_balance;
     }
 
-    function updateBalances() public onlyOwner{
-        for (uint256 i=0;i<walletAddresses.length;i++){
+    function updateBalances() public onlyOwner {
+        for (uint256 i = 0; i < walletAddresses.length; i++) {
             updateBalance(walletAddresses[i]);
         }
+    }
+
+    function calcLeftRightChildBalance(uint256 _position_id)
+        public
+        returns (uint256, uint256)
+    {
+        uint256 left_child_position = _position_id * 2 + 1;
+        uint256 right_child_position = _position_id * 2 + 2;
+        Partner memory left_partner = partnersByPositionId[left_child_position];
+        Partner memory right_partner = partnersByPositionId[
+            right_child_position
+        ];
+        address left_partner_wallet_address = left_partner.wallet_addres;
+        address right_partner_wallet_address = right_partner.wallet_addres;
+        uint256 left_partner_staked_balance = stakingBalance(
+            left_partner_wallet_address
+        );
+        uint256 right_partner_staked_balance = stakingBalance(
+            right_partner_wallet_address
+        );
+        return (left_partner_staked_balance, right_partner_staked_balance);
     }
 }

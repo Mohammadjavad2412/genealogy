@@ -25,12 +25,9 @@ contract Genealogy is Ownable, ReentrancyGuard {
     mapping(string => Partner) partnersByEbrCode;
     mapping(address => string[]) invitationLinksByreferallWalletAdress;
     mapping(address => string[]) invitationEbrPartnersByreferallWalletAddress;
+    uint256[] Childs;
     string[] refferalCodes;
-    uint256 left_child;
-    uint256 sub_child_numbers;
-    uint256 sub_child;
     uint256 position_id_from_ebr_code;
-    mapping(string => Partner) Childs;
     uint256 partnerCount;
     uint256[] position_ids;
     uint256 upline_position_id;
@@ -517,7 +514,7 @@ contract Genealogy is Ownable, ReentrancyGuard {
     }
 
     function updateUplinesBalances(uint256 _position_id,uint256 amount)public onlyOwner{
-        require(isValidPositionId(),"invalid postion id");
+        require(isValidPositionId(_position_id),"invalid postion id");
         bool not_done =true;
         uint256 up_line_position_id = calcUplineFromPositionId(_position_id);
         while (not_done){
@@ -540,5 +537,23 @@ contract Genealogy is Ownable, ReentrancyGuard {
                 not_done = false;
             }
         }
+    }
+
+    function calc_next_child(uint256 _number) public returns(uint256) {
+        uint256 left_child = _number * 2 + 1;
+        return left_child;
+    }
+    
+    function calc_childs(uint256 _number, uint256 _level) public returns(uint256[] memory) {
+        for (uint256 i = 1; i <= _level; i++) {
+            uint256 left_child = calc_next_child(_number);
+            uint256 sub_child_numbers = 2 ** i;
+            for (uint256 j = 0; j < sub_child_numbers; j++) {
+                uint256 sub_child = left_child + j;
+                Childs.push(sub_child);
+            _number = left_child;
+            }
+        }
+        return Childs;
     }
 }

@@ -84,11 +84,14 @@ contract Genealogy is Ownable, ReentrancyGuard {
         }
     }
 
-    function getDirectionByPositionId(uint256 _position_id) public view returns(string memory){
-        if (_position_id%2==0){
+    function getDirectionByPositionId(uint256 _position_id)
+        public
+        view
+        returns (string memory)
+    {
+        if (_position_id % 2 == 0) {
             return "r";
-        }
-        else{
+        } else {
             return "l";
         }
     }
@@ -411,7 +414,7 @@ contract Genealogy is Ownable, ReentrancyGuard {
         pure
         returns (uint256)
     {
-        if (_position_id==1 || _position_id==0){
+        if (_position_id == 1 || _position_id == 0) {
             return 0;
         }
         if (_position_id % 2 == 0) {
@@ -504,54 +507,66 @@ contract Genealogy is Ownable, ReentrancyGuard {
         return (left_partner_staked_balance, right_partner_staked_balance);
     }
 
-    function updatePartner(Partner memory partner)internal onlyOwner{
+    function updatePartner(Partner memory partner) internal onlyOwner {
         address wallet_address = partner.wallet_address;
         uint256 position_id = partner.position_id;
         string memory ebr_code = partner.ebr_code;
-        partnersByPositionId[position_id]=partner;
-        partnersByWalletAddress[wallet_address]=partner;
-        partnersByEbrCode[ebr_code]=partner;
+        partnersByPositionId[position_id] = partner;
+        partnersByWalletAddress[wallet_address] = partner;
+        partnersByEbrCode[ebr_code] = partner;
     }
 
-    function updateUplinesBalances(uint256 _position_id,uint256 amount)public onlyOwner{
-        require(isValidPositionId(_position_id),"invalid postion id");
-        bool not_done =true;
+    function updateUplinesBalances(uint256 _position_id, uint256 amount)
+        public
+        onlyOwner
+    {
+        require(isValidPositionId(_position_id), "invalid postion id");
+        bool not_done = true;
         uint256 up_line_position_id = calcUplineFromPositionId(_position_id);
-        while (not_done){
+        while (not_done) {
             Partner memory partner = partnersByPositionId[upline_position_id];
-            if (keccak256(abi.encodePacked(getDirectionByPositionId(_position_id)))==keccak256(abi.encodePacked("r"))){
+            if (
+                keccak256(
+                    abi.encodePacked(getDirectionByPositionId(_position_id))
+                ) == keccak256(abi.encodePacked("r"))
+            ) {
                 uint256 old_balance = partner.sum_right_balance;
                 uint256 new_balance = old_balance + amount;
                 partner.sum_right_balance = new_balance;
                 updatePartner(partner);
-            }
-            else{
+            } else {
                 uint256 old_balance = partner.sum_left_balance;
                 uint256 new_balance = old_balance + amount;
                 partner.sum_left_balance = new_balance;
                 updatePartner(partner);
             }
             uint256 _position_id = upline_position_id;
-            uint256 upline_position_id = calcUplineFromPositionId(upline_position_id);
-            if (_position_id ==0 && upline_position_id == 0){
+            uint256 upline_position_id = calcUplineFromPositionId(
+                upline_position_id
+            );
+            if (_position_id == 0 && upline_position_id == 0) {
                 not_done = false;
             }
         }
     }
 
-    function calc_next_child(uint256 _number) public returns(uint256) {
+    function calcFirstLeftChild(uint256 _number) public returns (uint256) {
         uint256 left_child = _number * 2 + 1;
         return left_child;
     }
-    
-    function calc_childs(uint256 _number, uint256 _level) public returns(uint256[] memory) {
+
+    function getChildsByLevel(uint256 _position_id, uint256 _level)
+        public
+        returns (uint256[] memory)
+    {
+        delete Childs;
         for (uint256 i = 1; i <= _level; i++) {
-            uint256 left_child = calc_next_child(_number);
-            uint256 sub_child_numbers = 2 ** i;
+            uint256 left_child = calcFirstLeftChild(_position_id);
+            uint256 sub_child_numbers = 2**i;
             for (uint256 j = 0; j < sub_child_numbers; j++) {
                 uint256 sub_child = left_child + j;
                 Childs.push(sub_child);
-            _number = left_child;
+                _position_id = left_child;
             }
         }
         return Childs;

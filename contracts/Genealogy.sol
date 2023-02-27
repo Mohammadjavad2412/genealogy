@@ -34,7 +34,7 @@ contract Genealogy is Ownable, ReentrancyGuard {
     uint256 upline_position_id;
     uint256 new_position_id;
     address StakingContract;
-    string public status;
+    address[] walletAddresses;
 
     constructor(string memory _admin_ebr_code, address stakeContractAddress) payable {
         partnerCount = 0;
@@ -224,7 +224,7 @@ contract Genealogy is Ownable, ReentrancyGuard {
         } else {
             string memory direction = "l";
         }
-        uint256 balance = gatherStakingBalance();
+        uint256 balance = MyStakingBalance();
         Partner memory partner = Partner(
             position_id,
             upline_position_id,
@@ -313,7 +313,7 @@ contract Genealogy is Ownable, ReentrancyGuard {
                 _direction
             );
         }
-        uint256 _balance = gatherStakingBalance();
+        uint256 _balance = MyStakingBalance();
         Partner memory partner = Partner(
             new_position_id,
             upline_position_id,
@@ -329,6 +329,7 @@ contract Genealogy is Ownable, ReentrancyGuard {
         position_ids.push(new_position_id); // storing all position ids
         partnersByPositionId[new_position_id] = partner;
         partnersByWalletAddress[msg.sender] = partner;
+        walletAddresses.push(msg.sender);
         partnerCount++;
         result = "success";
         return result;
@@ -420,10 +421,30 @@ contract Genealogy is Ownable, ReentrancyGuard {
         return result;
     }
 
-    function gatherStakingBalance() public returns (uint256){
+    function stakingBalance(address)public onlyOwner returns(uint256){
         bytes memory payload = abi.encodeWithSignature("BalanceOf(address)",msg.sender);
         (bool success, bytes memory returnData) = StakingContract.call(payload);
         uint256 balance = abi.decode(returnData, (uint256));
         return balance;
+    }
+
+    function MyStakingBalance() public returns (uint256){
+        bytes memory payload = abi.encodeWithSignature("BalanceOf(address)",msg.sender);
+        (bool success, bytes memory returnData) = StakingContract.call(payload);
+        uint256 balance = abi.decode(returnData, (uint256));
+        return balance;
+    }
+
+    function updateBalance(address _wallet_address)internal onlyOwner returns(uint256){
+        Partner memory partner = partnersByWalletAddress[_wallet_address];
+        uint256 new_balance = stakingBalance(_wallet_address);
+        partner.balance = new_balance;
+        return new_balance;
+    }
+
+    function updateBalances() public onlyOwner{
+        for (uint256 i=0;i<walletAddresses.length;i++){
+            updateBalance(walletAddresses[i]);
+        }
     }
 }

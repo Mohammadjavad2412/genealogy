@@ -36,11 +36,8 @@ contract Genealogy is Ownable, ReentrancyGuard {
     address StakingContract;
     address[] walletAddresses;
 
-    constructor(string memory _admin_ebr_code, address stakeContractAddress)
-        payable
-    {
+    constructor(address stakeContractAddress) payable {
         partnerCount = 0;
-        // addPartner(_admin_ebr_code, "none", "none");
         StakingContract = stakeContractAddress;
     }
 
@@ -254,11 +251,11 @@ contract Genealogy is Ownable, ReentrancyGuard {
             block.timestamp,
             true
         );
-        updateUplinesChildsCount(position_id);
         partnersByEbrCode[invited_ebr_code] = partner;
         position_ids.push(position_id);
         partnersByPositionId[position_id] = partner;
         partnersByWalletAddress[msg.sender] = partner;
+        updateUplinesChildsCount(position_id);
         partnerCount++;
         return "successfully add partner";
     }
@@ -347,14 +344,15 @@ contract Genealogy is Ownable, ReentrancyGuard {
             block.timestamp,
             true
         );
-        if (new_position_id!=0){
-            updateUplinesChildsCount(new_position_id);
-        }
+
         partnersByEbrCode[_ebr_code] = partner;
         position_ids.push(new_position_id); // storing all position ids
         partnersByPositionId[new_position_id] = partner;
         partnersByWalletAddress[msg.sender] = partner;
         walletAddresses.push(msg.sender);
+        if (new_position_id != 0) {
+            updateUplinesChildsCount(new_position_id);
+        }
         partnerCount++;
         result = "success";
         return result;
@@ -499,28 +497,7 @@ contract Genealogy is Ownable, ReentrancyGuard {
         }
     }
 
-    function calcLeftRightChildBalance(uint256 _position_id)
-        public
-        returns (uint256, uint256)
-    {
-        uint256 left_child_position = _position_id * 2 + 1;
-        uint256 right_child_position = _position_id * 2 + 2;
-        Partner memory left_partner = partnersByPositionId[left_child_position];
-        Partner memory right_partner = partnersByPositionId[
-            right_child_position
-        ];
-        address left_partner_wallet_address = left_partner.wallet_address;
-        address right_partner_wallet_address = right_partner.wallet_address;
-        uint256 left_partner_staked_balance = stakingBalance(
-            left_partner_wallet_address
-        );
-        uint256 right_partner_staked_balance = stakingBalance(
-            right_partner_wallet_address
-        );
-        return (left_partner_staked_balance, right_partner_staked_balance);
-    }
-
-    function updatePartner(Partner memory partner) internal onlyOwner {
+    function updatePartner(Partner memory partner) internal {
         address wallet_address = partner.wallet_address;
         uint256 position_id = partner.position_id;
         string memory ebr_code = partner.ebr_code;
@@ -535,52 +512,99 @@ contract Genealogy is Ownable, ReentrancyGuard {
     {
         require(isValidPositionId(_position_id), "invalid postion id");
         bool not_done = true;
-        uint256 up_line_position_id = calcUplineFromPositionId(_position_id);
-        while (not_done) {
-            Partner memory partner = partnersByPositionId[upline_position_id];
-            if (
-                keccak256(
-                    abi.encodePacked(getDirectionByPositionId(_position_id))
-                ) == keccak256(abi.encodePacked("r"))
-            ) {
-                uint256 old_balance = partner.sum_right_balance;
-                uint256 new_balance = old_balance + amount;
-                partner.sum_right_balance = new_balance;
-                updatePartner(partner);
-            } else {
+        uint256 upline_position_id = calcUplineFromPositionId(_position_id);
+        if (_position_id == 1 || _position_id == 2) {
+            Partner memory partner = partnersByPositionId[0];
+            if (_position_id == 1) {
                 uint256 old_balance = partner.sum_left_balance;
                 uint256 new_balance = old_balance + amount;
                 partner.sum_left_balance = new_balance;
                 updatePartner(partner);
+            } else {
+                uint256 old_balance = partner.sum_right_balance;
+                uint256 new_balance = old_balance + amount;
+                partner.sum_right_balance = new_balance;
+                updatePartner(partner);
             }
-            uint256 _position_id = upline_position_id;
-            uint256 upline_position_id = calcUplineFromPositionId(
-                upline_position_id
-            );
-            if (_position_id == 0 && upline_position_id == 0) {
-                not_done = false;
+        } else {
+            while (not_done) {
+                Partner memory partner = partnersByPositionId[
+                    upline_position_id
+                ];
+                if (
+                    keccak256(
+                        abi.encodePacked(getDirectionByPositionId(_position_id))
+                    ) == keccak256(abi.encodePacked("r"))
+                ) {
+                    uint256 old_balance = partner.sum_right_balance;
+                    uint256 new_balance = old_balance + amount;
+                    partner.sum_right_balance = new_balance;
+                    updatePartner(partner);
+                } else {
+                    uint256 old_balance = partner.sum_left_balance;
+                    uint256 new_balance = old_balance + amount;
+                    partner.sum_left_balance = new_balance;
+                    updatePartner(partner);
+                }
+                uint256 previous_position_id = _position_id;
+                uint256 _position_id = upline_position_id;
+                uint256 upline_position_id = calcUplineFromPositionId(
+                    upline_position_id
+                );
+                if (_position_id == 0 && upline_position_id == 0) {
+                    Partner memory partner = partnersByPositionId[0];
+                    if (previous_position_id == 1) {
+                        uint256 old_balance = partner.sum_left_balance;
+                        uint256 new_balance = old_balance + amount;
+                        partner.sum_left_balance = new_balance;
+                        updatePartner(partner);
+                    } else {
+                        uint256 old_balance = partner.sum_right_balance;
+                        uint256 new_balance = old_balance + amount;
+                        partner.sum_right_balance = new_balance;
+                        updatePartner(partner);
+                    }
+                    not_done = false;
+                }
             }
         }
     }
 
-    function updateUplinesChildsCount(uint256 _position_id)internal{
-        require(isValidPositionId(_position_id),"invalid postion id");
-        bool not_done =true;
+    function updateUplinesChildsCount(uint256 _position_id) internal {
+        require(isValidPositionId(_position_id), "invalid postion id");
+        bool not_done = true;
         uint256 upline_position_id = calcUplineFromPositionId(_position_id);
-        while (not_done){
-            Partner memory partner = partnersByPositionId[upline_position_id];
+        if (_position_id == 1 || _position_id == 2) {
+            Partner memory partner = partnersByPositionId[0];
             uint256 old_child_count = partner.childs_count;
             uint256 new_child_count = old_child_count + 1;
             partner.childs_count = new_child_count;
             updatePartner(partner);
-            uint256 _position_id = upline_position_id;
-            uint256 upline_position_id = calcUplineFromPositionId(upline_position_id);
-            if (_position_id ==0 && upline_position_id == 0){
-                not_done = false;
+        } else {
+            while (not_done) {
+                Partner memory partner = partnersByPositionId[
+                    upline_position_id
+                ];
+                uint256 old_child_count = partner.childs_count;
+                uint256 new_child_count = old_child_count + 1;
+                partner.childs_count = new_child_count;
+                updatePartner(partner);
+                uint256 upline_position_id = calcUplineFromPositionId(
+                    upline_position_id
+                );
+                uint256 _position_id = upline_position_id;
+                if (_position_id == 0 && upline_position_id == 0) {
+                    Partner memory partner = partnersByPositionId[0];
+                    uint256 old_child_count = partner.childs_count;
+                    uint256 new_child_count = old_child_count + 1;
+                    partner.childs_count = new_child_count;
+                    updatePartner(partner);
+                    not_done = false;
+                }
             }
         }
     }
-    
+
     function calcFirstLeftChild(uint256 _number) public returns (uint256) {
         uint256 left_child = _number * 2 + 1;
         return left_child;

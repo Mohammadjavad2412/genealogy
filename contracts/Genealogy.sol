@@ -547,10 +547,10 @@ contract Genealogy is Ownable, ReentrancyGuard {
                     updatePartner(partner);
                 }
                 uint256 previous_position_id = _position_id;
-                uint256 _position_id = upline_position_id;
                 uint256 upline_position_id = calcUplineFromPositionId(
                     upline_position_id
                 );
+                uint256 _position_id = upline_position_id;
                 if (_position_id == 0 && upline_position_id == 0) {
                     Partner memory partner = partnersByPositionId[0];
                     if (previous_position_id == 1) {

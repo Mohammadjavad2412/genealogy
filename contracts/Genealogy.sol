@@ -27,6 +27,7 @@ contract Genealogy is Ownable, ReentrancyGuard {
     mapping(address => string[]) invitationLinksByreferallWalletAdress;
     mapping(address => string[]) invitationEbrPartnersByreferallWalletAddress;
     uint256[] Childs;
+    uint256[] each_level_childs_number;
     string[] refferalCodes;
     uint256 position_id_from_ebr_code;
     uint256 partnerCount;
@@ -626,4 +627,25 @@ contract Genealogy is Ownable, ReentrancyGuard {
         }
         return Childs;
     }
+
+    function getChildsCountByLevel(uint256 _level) public returns (uint256) {
+        delete each_level_childs_number;
+        uint256 result;
+        for (uint256 i = 1; i <= _level; i++) {
+            uint256 _level_childs_number = 2**i;
+            each_level_childs_number.push(_level_childs_number);
+        }
+        for (uint256 i = 0; i < each_level_childs_number.length; i++) {
+            uint256 previous_result = each_level_childs_number[i];
+            result = previous_result + result;
+        }
+        return result;
+    }
+
+    // function updateUplinesPartnerChilds(uint256 _position_id) internal {
+    //     require(isValidPositionId(_position_id), "invalid postion id");
+    //     bool note_done = true;
+    //     if (_position_id == 1 || _position_id == 2)
+
+    // }
 }

@@ -16,6 +16,7 @@ contract Genealogy is Ownable, ReentrancyGuard {
         uint256 balance;
         uint256 sum_left_balance;
         uint256 sum_right_balance;
+        uint256 childs_count;
         uint256 created_at;
         uint256 last_update;
         bool isValue;
@@ -245,10 +246,12 @@ contract Genealogy is Ownable, ReentrancyGuard {
             balance,
             0,
             0,
+            0,
             block.timestamp,
             block.timestamp,
             true
         );
+        updateUplinesChildsCount(position_id);
         partnersByEbrCode[invited_ebr_code] = partner;
         position_ids.push(position_id);
         partnersByPositionId[position_id] = partner;
@@ -336,10 +339,14 @@ contract Genealogy is Ownable, ReentrancyGuard {
             _balance,
             0,
             0,
+            0,
             block.timestamp,
             block.timestamp,
             true
         );
+        if (new_position_id!=0){
+            updateUplinesChildsCount(new_position_id);
+        }
         partnersByEbrCode[_ebr_code] = partner;
         position_ids.push(new_position_id); // storing all position ids
         partnersByPositionId[new_position_id] = partner;
@@ -384,6 +391,9 @@ contract Genealogy is Ownable, ReentrancyGuard {
         string[] memory ebr_code = new string[](partnerCount);
         string[] memory direction = new string[](partnerCount);
         uint256[] memory balance = new uint256[](partnerCount);
+        uint256[] memory sum_left_balance = new uint256[](partnerCount);
+        uint256[] memory sum_right_balance = new uint256[](partnerCount);
+        uint256[] memory childs_count = new uint256[](partnerCount);
         for (uint256 i = 0; i < position_ids.length; i++) {
             uint256 j = position_ids[i];
             Partner memory partner = partnersByPositionId[j];
@@ -392,6 +402,9 @@ contract Genealogy is Ownable, ReentrancyGuard {
             ebr_code[i] = partner.ebr_code;
             direction[i] = partner.direction;
             balance[i] = partner.balance;
+            sum_left_balance[i] = partner.sum_left_balance;
+            sum_right_balance[i] = partner.sum_left_balance;
+            childs_count[i] = partner.childs_count;
         }
         return (id, wallet_address, ebr_code, direction, balance);
     }
@@ -539,12 +552,31 @@ contract Genealogy is Ownable, ReentrancyGuard {
         }
     }
 
+    function updateUplinesChildsCount(uint256 _position_id)internal{
+        require(isValidPositionId(_position_id),"invalid postion id");
+        bool not_done =true;
+        uint256 upline_position_id = calcUplineFromPositionId(_position_id);
+        while (not_done){
+            Partner memory partner = partnersByPositionId[upline_position_id];
+            uint256 old_child_count = partner.childs_count;
+            uint256 new_child_count = old_child_count + 1;
+            partner.childs_count = new_child_count;
+            updatePartner(partner);
+            uint256 _position_id = upline_position_id;
+            uint256 upline_position_id = calcUplineFromPositionId(upline_position_id);
+            if (_position_id ==0 && upline_position_id == 0){
+                not_done = false;
+            }
+        }
+    }
+
     function calc_next_child(uint256 _number) public returns(uint256) {
         uint256 left_child = _number * 2 + 1;
         return left_child;
     }
     
     function calc_childs(uint256 _number, uint256 _level) public returns(uint256[] memory) {
+        delete Childs;
         for (uint256 i = 1; i <= _level; i++) {
             uint256 left_child = calc_next_child(_number);
             uint256 sub_child_numbers = 2 ** i;

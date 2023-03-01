@@ -17,6 +17,7 @@ contract Genealogy is Ownable, ReentrancyGuard {
         uint256 sum_left_balance;
         uint256 sum_right_balance;
         uint256 childs_count;
+        uint256 full_fill_level;
         uint256 created_at;
         uint256 last_update;
         bool isValue;
@@ -27,6 +28,7 @@ contract Genealogy is Ownable, ReentrancyGuard {
     mapping(address => string[]) invitationLinksByreferallWalletAdress;
     mapping(address => string[]) invitationEbrPartnersByreferallWalletAddress;
     uint256[] Childs;
+    uint256[] assume_full_fill_level_partners;
     uint256[] each_level_childs_number;
     string[] refferalCodes;
     uint256 position_id_from_ebr_code;
@@ -248,6 +250,7 @@ contract Genealogy is Ownable, ReentrancyGuard {
             0,
             0,
             0,
+            0,
             block.timestamp,
             block.timestamp,
             true
@@ -257,6 +260,7 @@ contract Genealogy is Ownable, ReentrancyGuard {
         partnersByPositionId[position_id] = partner;
         partnersByWalletAddress[msg.sender] = partner;
         updateUplinesChildsCount(position_id);
+        updateUplinesFullFillLevel(position_id);
         partnerCount++;
         return "successfully add partner";
     }
@@ -341,6 +345,7 @@ contract Genealogy is Ownable, ReentrancyGuard {
             0,
             0,
             0,
+            0,
             block.timestamp,
             block.timestamp,
             true
@@ -353,7 +358,9 @@ contract Genealogy is Ownable, ReentrancyGuard {
         walletAddresses.push(msg.sender);
         if (new_position_id != 0) {
             updateUplinesChildsCount(new_position_id);
+            updateUplinesFullFillLevel(new_position_id);
         }
+
         partnerCount++;
         result = "success";
         return result;
@@ -502,6 +509,7 @@ contract Genealogy is Ownable, ReentrancyGuard {
         address wallet_address = partner.wallet_address;
         uint256 position_id = partner.position_id;
         string memory ebr_code = partner.ebr_code;
+        partner.last_update = block.timestamp;
         partnersByPositionId[position_id] = partner;
         partnersByWalletAddress[wallet_address] = partner;
         partnersByEbrCode[ebr_code] = partner;
@@ -642,12 +650,112 @@ contract Genealogy is Ownable, ReentrancyGuard {
         return result;
     }
 
-    function log_2(uint256 number)public pure returns(uint8){
-        for (uint8 n=0;n<256;n++){
-            if(number>=2**n && number<2**(n+1)){
+    function log_2(uint256 number) public pure returns (uint8) {
+        require(number > 0, "number should not be zero!");
+        for (uint8 n = 0; n < 256; n++) {
+            if (number >= 2**n && number < 2**(n + 1)) {
                 return n;
             }
         }
     }
+
+    function getFullLevelByChildsCount(uint256 _childs_number)
+        public
+        returns (uint256 result)
+    {
+        uint256 result = log_2(_childs_number);
+        return result;
+    }
+
+    function getChildsInSpecificLevel(uint256 _position_id, uint256 _level)
+        public
+        returns (uint256[] memory)
+    {
+        delete Childs;
+        if (_level == 0) {
+            Childs.push(_position_id);
+            return Childs;
+        }
+        for (uint256 i = 1; i <= _level; i++) {
+            uint256 left_child = calcFirstLeftChild(_position_id);
+            _position_id = left_child;
+            if (i == _level) {
+                uint256 sub_child_numbers = 2**i;
+                for (uint256 j = 0; j < sub_child_numbers; j++) {
+                    uint256 sub_child = left_child + j;
+                    Childs.push(sub_child);
+                }
+                return Childs;
+            }
+        }
+    }
+
+    function FullFillLevel(uint256 _position_id) public returns (uint256) {
+        delete assume_full_fill_level_partners;
+        Partner memory partner = partnersByPositionId[_position_id];
+        uint256 childs_count = partner.childs_count;
+        if (childs_count == 0) {
+            return 0;
+        }
+        bool not_done = true;
+        uint256 assume_full_fill_level = getFullLevelByChildsCount(
+            childs_count
+        );
+        while (not_done) {
+            assume_full_fill_level_partners = getChildsInSpecificLevel(
+                _position_id,
+                assume_full_fill_level
+            );
+            for (
+                uint256 i = 0;
+                i < assume_full_fill_level_partners.length;
+                i++
+            ) {
+                Partner memory child_partner = partnersByPositionId[
+                    assume_full_fill_level_partners[i]
+                ];
+                if (child_partner.isValue == false) {
+                    assume_full_fill_level = assume_full_fill_level - 1;
+                }
+            }
+            not_done = false;
+        }
+        uint256 full_fill_level = assume_full_fill_level;
+        return full_fill_level;
+    }
+
+    function updateUplinesFullFillLevel(uint256 _position_id) internal {
+        require(isValidPositionId(_position_id), "invalid postion id");
+        bool not_done = true;
+        uint256 upline_position_id = calcUplineFromPositionId(_position_id);
+        if (_position_id == 1 || _position_id == 2) {
+            Partner memory partner = partnersByPositionId[0];
+            uint256 old_level = partner.full_fill_level;
+            uint256 new_level = FullFillLevel(0);
+            partner.full_fill_level = new_level;
+            updatePartner(partner);
+        } else {
+            while (not_done) {
+                Partner memory partner = partnersByPositionId[
+                    upline_position_id
+                ];
+                uint256 old_level = partner.full_fill_level;
+                uint256 new_level = FullFillLevel(0);
+                partner.full_fill_level = new_level;
+                updatePartner(partner);
+                uint256 upline_position_id = calcUplineFromPositionId(
+                    upline_position_id
+                );
+                uint256 _position_id = upline_position_id;
+                if (_position_id == 0 && upline_position_id == 0) {
+                    Partner memory partner = partnersByPositionId[0];
+                    uint256 old_level = partner.full_fill_level;
+                    uint256 new_level = FullFillLevel(0);
+                    partner.full_fill_level = new_level;
+                    updatePartner(partner);
+                    not_done = false;
+                }
+            }
+        }
+    }
 }
- 

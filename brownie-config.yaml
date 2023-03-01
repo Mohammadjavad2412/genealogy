@@ -1,1 +1,11 @@
 dotenv: .env 
+
+dependencies:
+    - OpenZeppelin/openzeppelin-contracts@4.8.0
+    - Arachnid
+
+compiler:
+    solc:
+        remappings:
+            - "@openzeppelin=OpenZeppelin/openzeppelin-contracts@4.8.0"
+            - "@Arachnid=Arachnid"

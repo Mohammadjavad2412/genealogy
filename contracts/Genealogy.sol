@@ -642,10 +642,12 @@ contract Genealogy is Ownable, ReentrancyGuard {
         return result;
     }
 
-    // function updateUplinesPartnerChilds(uint256 _position_id) internal {
-    //     require(isValidPositionId(_position_id), "invalid postion id");
-    //     bool note_done = true;
-    //     if (_position_id == 1 || _position_id == 2)
-
-    // }
+    function log_2(uint256 number)public pure returns(uint8){
+        for (uint8 n=0;n<256;n++){
+            if(number>=2**n && number<2**(n+1)){
+                return n;
+            }
+        }
+    }
 }
+ 

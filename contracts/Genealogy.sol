@@ -4,6 +4,7 @@ import "@openzeppelin/contracts/utils/Strings.sol";
 import "github.com/Arachnid/solidity-stringutils/blob/master/src/strings.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract Genealogy is Ownable, ReentrancyGuard {
     using strings for *;
@@ -22,6 +23,7 @@ contract Genealogy is Ownable, ReentrancyGuard {
         uint256 last_update;
         bool isValue;
     }
+
     mapping(uint256 => Partner) partnersByPositionId;
     mapping(address => Partner) partnersByWalletAddress;
     mapping(string => Partner) partnersByEbrCode;
@@ -36,12 +38,16 @@ contract Genealogy is Ownable, ReentrancyGuard {
     uint256[] position_ids;
     uint256 upline_position_id;
     uint256 new_position_id;
-    address StakingContract;
+    address public StakingContractAddress;
+    address public DappTokenContractAddress;
     address[] walletAddresses;
 
-    constructor(address stakeContractAddress) payable {
+    constructor(address stakeContractAddress, address dappTokenContractAddress)
+        payable
+    {
         partnerCount = 0;
-        StakingContract = stakeContractAddress;
+        StakingContractAddress = stakeContractAddress;
+        DappTokenContractAddress = dappTokenContractAddress;
     }
 
     function isValidEbrCode(string memory _ebr_code)
@@ -255,6 +261,12 @@ contract Genealogy is Ownable, ReentrancyGuard {
             block.timestamp,
             true
         );
+        // referral bonus
+        uint256 _amount = (balance * 1) / 10;
+        string memory _ebr_code = parts[1];
+        Partner memory _referrer_partner = partnersByEbrCode[_ebr_code];
+        address _referrer_partner_address = _referrer_partner.wallet_address;
+        referralBonus(_referrer_partner_address, _amount);
         partnersByEbrCode[invited_ebr_code] = partner;
         position_ids.push(position_id);
         partnersByPositionId[position_id] = partner;
@@ -459,7 +471,9 @@ contract Genealogy is Ownable, ReentrancyGuard {
             "isStakerByAddress(address)",
             msg.sender
         );
-        (bool success, bytes memory returnData) = StakingContract.call(payload);
+        (bool success, bytes memory returnData) = StakingContractAddress.call(
+            payload
+        );
         bool result = abi.decode(returnData, (bool));
         return result;
     }
@@ -473,7 +487,9 @@ contract Genealogy is Ownable, ReentrancyGuard {
             "BalanceOf(address)",
             _staker_addr
         );
-        (bool success, bytes memory returnData) = StakingContract.call(payload);
+        (bool success, bytes memory returnData) = StakingContractAddress.call(
+            payload
+        );
         uint256 balance = abi.decode(returnData, (uint256));
         return balance;
     }
@@ -483,7 +499,9 @@ contract Genealogy is Ownable, ReentrancyGuard {
             "BalanceOf(address)",
             msg.sender
         );
-        (bool success, bytes memory returnData) = StakingContract.call(payload);
+        (bool success, bytes memory returnData) = StakingContractAddress.call(
+            payload
+        );
         uint256 balance = abi.decode(returnData, (uint256));
         return balance;
     }
@@ -757,5 +775,9 @@ contract Genealogy is Ownable, ReentrancyGuard {
                 }
             }
         }
+    }
+
+    function referralBonus(address _to, uint256 _amount) internal {
+        IERC20(DappTokenContractAddress).transfer(_to, _amount);
     }
 }

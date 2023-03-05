@@ -266,7 +266,7 @@ contract Genealogy is Ownable, ReentrancyGuard {
         string memory _ebr_code = parts[1];
         Partner memory _referrer_partner = partnersByEbrCode[_ebr_code];
         address _referrer_partner_address = _referrer_partner.wallet_address;
-        referralBonus(_referrer_partner_address, _amount);
+        transferFromDappContract(_referrer_partner_address, _amount);
         partnersByEbrCode[invited_ebr_code] = partner;
         position_ids.push(position_id);
         partnersByPositionId[position_id] = partner;
@@ -777,7 +777,91 @@ contract Genealogy is Ownable, ReentrancyGuard {
         }
     }
 
-    function referralBonus(address _to, uint256 _amount) internal {
+    function transferFromDappContract(address _to, uint256 _amount) internal {
         IERC20(DappTokenContractAddress).transfer(_to, _amount);
+    }
+
+    function calcPartnerStakingReward(address _staker_addr)
+        public
+        returns (uint256)
+    {
+        bytes memory payload = abi.encodeWithSignature(
+            "calculateRewardsByAddress(address)",
+            _staker_addr
+        );
+        (bool success, bytes memory returnData) = StakingContractAddress.call(
+            payload
+        );
+        uint256 reward = abi.decode(returnData, (uint256));
+        return reward;
+    }
+
+    function calcUplinesPositionIdsFromPositionId(uint256 _position_id)
+        public
+        returns (uint256[] memory)
+    {
+        delete Childs;
+        require(isValidPositionId(_position_id), "invalid postion id");
+        bool not_done = true;
+        while (not_done) {
+            uint256 _upline_postion_id = calcUplineFromPositionId(_position_id);
+            Childs.push(_upline_postion_id);
+            _position_id = _upline_postion_id;
+            if (_position_id == 0) {
+                not_done = false;
+            }
+        }
+        return Childs;
+    }
+
+    function updateUplinesUniLevelRewards(uint256 _position_id)
+        public
+        payable
+        onlyOwner
+    {
+        require(isValidPositionId(_position_id), "invalid postion id");
+        bool not_done = true;
+        while (not_done) {
+            Partner memory partner = partnersByPositionId[_position_id];
+            address partner_wallet_address = partner.wallet_address;
+            uint256 _reward = getStakerRewardsUpToNow(partner_wallet_address);
+            uint256[]
+                memory _upline_position_ids = calcUplinesPositionIdsFromPositionId(
+                    _position_id
+                );
+            for (uint256 i = 0; i < _upline_position_ids.length; i++) {
+                if (i < 20) {
+                    Partner
+                        memory one_of_upline_partners = partnersByPositionId[
+                            _upline_position_ids[i]
+                        ];
+                    address one_of_upline_partners_wallet_address = one_of_upline_partners
+                            .wallet_address;
+                    transferFromDappContract(
+                        one_of_upline_partners_wallet_address,
+                        _reward
+                    );
+                }
+            }
+            uint256 _position_id = calcUplineFromPositionId(_position_id);
+            if (_position_id == 0) {
+                not_done = false;
+            }
+        }
+    }
+
+    function getStakerRewardsUpToNow(address _staker_addr)
+        public
+        returns (uint256)
+    {
+        bytes memory payload = abi.encodeWithSignature(
+            "TotalRewardsUpToNow(address)",
+            _staker_addr
+        );
+        (bool success, bytes memory returnData) = StakingContractAddress.call(
+            payload
+        );
+        uint256 _reward = abi.decode(returnData, (uint256));
+        return _reward;
     }
 }

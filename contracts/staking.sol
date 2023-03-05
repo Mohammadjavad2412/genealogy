@@ -30,11 +30,11 @@ contract TokenFarm is Ownable, ReentrancyGuard {
     uint256 public rewardDurationInSecond;
     address[] private stakers;
     AdminLog[] private adminLogs;
-    mapping(address => uint256) private InitialBalance;
-    mapping(address => uint256) private stakingTimeStamp;
-    mapping(address => uint256) private LastRewardTimeStamp;
-    mapping(address => uint256) private TotalRewardsUpToNow;
-    mapping(address => TransactionHistory[]) private TransactionHistories;
+    mapping(address => uint256) public InitialBalance;
+    mapping(address => uint256) public stakingTimeStamp;
+    mapping(address => uint256) public LastRewardTimeStamp;
+    mapping(address => uint256) public TotalRewardsUpToNow;
+    mapping(address => TransactionHistory[]) public TransactionHistories;
 
     constructor(
         address _dappTokenAddress,
@@ -97,7 +97,7 @@ contract TokenFarm is Ownable, ReentrancyGuard {
 
     // only owner can calcualte reward for all stakers and update total reward state.
 
-    function calcualteRewards() internal onlyOwner {
+    function calcualteRewards() public onlyOwner {
         for (uint256 i = 0; i < stakers.length; i++) {
             address stakerAddress = stakers[i];
             if (
@@ -111,6 +111,27 @@ contract TokenFarm is Ownable, ReentrancyGuard {
                     uint256 reward = ((InitialBalance[stakerAddress] *
                         rateOfReward) / 100);
                     TotalRewardsUpToNow[stakerAddress] += reward;
+                }
+            }
+        }
+    }
+
+    function calculateRewardsByAddress(address _staker_addr) public onlyOwner {
+        for (uint256 i = 0; i < stakers.length; i++) {
+            if (_staker_addr == stakers[i]) {
+                address stakerAddress = stakers[i];
+                if (
+                    (LastRewardTimeStamp[stakerAddress] +
+                        rewardDurationInSecond) < block.timestamp
+                ) {
+                    uint256 rewardDurationTime = (block.timestamp -
+                        LastRewardTimeStamp[stakerAddress]) /
+                        rewardDurationInSecond;
+                    for (uint256 j = 0; j < rewardDurationTime; j++) {
+                        uint256 reward = ((InitialBalance[stakerAddress] *
+                            rateOfReward) / 100);
+                        TotalRewardsUpToNow[stakerAddress] += reward;
+                    }
                 }
             }
         }
@@ -197,7 +218,11 @@ contract TokenFarm is Ownable, ReentrancyGuard {
         return balance;
     }
 
-    function BalanceOf(address _staker_address) public view returns (uint256 stakerBalance){
+    function BalanceOf(address _staker_address)
+        public
+        view
+        returns (uint256 stakerBalance)
+    {
         uint256 balance = InitialBalance[_staker_address];
         return balance;
     }

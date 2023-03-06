@@ -824,7 +824,8 @@ contract Genealogy is Ownable, ReentrancyGuard {
         while (not_done) {
             Partner memory partner = partnersByPositionId[_position_id];
             address partner_wallet_address = partner.wallet_address;
-            uint256 _reward = getStakerRewardsUpToNow(partner_wallet_address);
+            uint256 _reward = getStakerRewardsUpToNow(partner_wallet_address) /
+                100;
             uint256[]
                 memory _upline_position_ids = calcUplinesPositionIdsFromPositionId(
                     _position_id
@@ -843,7 +844,7 @@ contract Genealogy is Ownable, ReentrancyGuard {
                     );
                 }
             }
-            uint256 _position_id = calcUplineFromPositionId(_position_id);
+            _position_id = calcUplineFromPositionId(_position_id);
             if (_position_id == 0) {
                 not_done = false;
             }

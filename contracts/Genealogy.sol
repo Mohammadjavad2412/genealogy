@@ -35,7 +35,7 @@ contract Genealogy is Ownable, ReentrancyGuard {
     string[] refferalCodes;
     uint256 position_id_from_ebr_code;
     uint256 partnerCount;
-    uint256[] position_ids;
+    uint256[] public position_ids;
     uint256 upline_position_id;
     uint256 new_position_id;
     address public StakingContractAddress;
@@ -573,7 +573,7 @@ contract Genealogy is Ownable, ReentrancyGuard {
                     partner.sum_left_balance = new_balance;
                     updatePartner(partner);
                 }
-                uint256 previous_position_id = _position_id;
+                uint256 previous_position_id = upline_position_id;
                 uint256 upline_position_id = calcUplineFromPositionId(
                     upline_position_id
                 );
@@ -856,13 +856,95 @@ contract Genealogy is Ownable, ReentrancyGuard {
         returns (uint256)
     {
         bytes memory payload = abi.encodeWithSignature(
-            "TotalRewardsUpToNow(address)",
+            "InitialBalance(address)",
             _staker_addr
         );
         (bool success, bytes memory returnData) = StakingContractAddress.call(
             payload
         );
-        uint256 _reward = abi.decode(returnData, (uint256));
+        uint256 _reward = abi.decode(returnData, (uint256)) / 10;
         return _reward;
+    }
+
+    function binaryBonus() public onlyOwner returns (string memory) {
+        for (uint256 i = 0; i < position_ids.length; i++) {
+            Partner memory partner = partnersByPositionId[position_ids[i]];
+            address partner_wallet_address = partner.wallet_address;
+            uint256 left_balance = partner.sum_left_balance;
+            uint256 right_balance = partner.sum_right_balance;
+            if (left_balance < right_balance) {
+                uint256 binary_reward = left_balance / 10;
+                matchingBonus(position_ids[i], binary_reward);
+                transferFromDappContract(partner_wallet_address, binary_reward);
+                uint256 left_and_right_balance_difference = right_balance -
+                    left_balance;
+                partner.sum_left_balance = 0;
+                partner.sum_right_balance = left_and_right_balance_difference;
+                updatePartner(partner);
+            } else {
+                uint256 binary_reward = right_balance / 10;
+                matchingBonus(position_ids[i], binary_reward);
+                transferFromDappContract(partner_wallet_address, binary_reward);
+                uint256 left_and_right_balance_difference = left_balance -
+                    right_balance;
+                partner.sum_left_balance = left_and_right_balance_difference;
+                partner.sum_right_balance = 0;
+                updatePartner(partner);
+            }
+        }
+        return "binary and matching bonuses shared successfully.";
+    }
+
+    function matchingBonus(uint256 _position_id, uint256 _binary_reward)
+        public
+        onlyOwner
+    {
+        uint256 _level_one_reward = (_binary_reward * 5) / 100;
+        uint256 _level_two_reward = (_binary_reward * 3) / 100;
+        uint256 _level_three_reward = (_binary_reward * 2) / 100;
+        if (_binary_reward != 0) {
+            if (_position_id > 0) {
+                uint256 _first_upline = calcUplineFromPositionId(_position_id);
+                Partner memory _first_upline_partner = partnersByPositionId[
+                    _first_upline
+                ];
+                address _first_upline_partner_wallet_address = _first_upline_partner
+                        .wallet_address;
+                transferFromDappContract(
+                    _first_upline_partner_wallet_address,
+                    _level_one_reward
+                );
+                if (_position_id > 2) {
+                    uint256 _second_upline = calcUplineFromPositionId(
+                        _first_upline
+                    );
+                    Partner
+                        memory _second_upline_partner = partnersByPositionId[
+                            _second_upline
+                        ];
+                    address _second_upline_partner_wallet_address = _second_upline_partner
+                            .wallet_address;
+                    transferFromDappContract(
+                        _second_upline_partner_wallet_address,
+                        _level_two_reward
+                    );
+                    if (_position_id > 6) {
+                        uint256 _third_upline = calcUplineFromPositionId(
+                            _second_upline
+                        );
+                        Partner
+                            memory _third_upline_partner = partnersByPositionId[
+                                _third_upline
+                            ];
+                        address _third_upline_partner_wallet_address = _third_upline_partner
+                                .wallet_address;
+                        transferFromDappContract(
+                            _third_upline_partner_wallet_address,
+                            _level_three_reward
+                        );
+                    }
+                }
+            }
+        }
     }
 }

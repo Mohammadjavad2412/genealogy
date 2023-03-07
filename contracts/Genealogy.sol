@@ -1028,4 +1028,18 @@ contract Genealogy is Ownable, ReentrancyGuard {
             transactionslog
         );
     }
+
+    function partnerBonusesHistory() public returns (TransactionsLog[] memory) {
+        require(isValidWalletAddress(), "address is not valid");
+        return transactionLogsByAddress[msg.sender];
+    }
+
+    function allBonusesHistory(address _wallet_address)
+        public
+        onlyOwner
+        returns (TransactionsLog[] memory)
+    {
+        require(isValidWalletAddress(), "address is not valid");
+        return transactionLogsByAddress[_wallet_address];
+    }
 }

@@ -24,9 +24,17 @@ contract Genealogy is Ownable, ReentrancyGuard {
         bool isValue;
     }
 
+    struct TransactionsLog {
+        address from;
+        uint256 amount;
+        string transaction_type;
+        uint256 timestamp;
+    }
+
     mapping(uint256 => Partner) partnersByPositionId;
     mapping(address => Partner) partnersByWalletAddress;
     mapping(string => Partner) partnersByEbrCode;
+    mapping(address => TransactionsLog[]) transactionLogsByAddress;
     mapping(address => string[]) invitationLinksByreferallWalletAdress;
     mapping(address => string[]) invitationEbrPartnersByreferallWalletAddress;
     uint256[] Childs;
@@ -267,6 +275,7 @@ contract Genealogy is Ownable, ReentrancyGuard {
         Partner memory _referrer_partner = partnersByEbrCode[_ebr_code];
         address _referrer_partner_address = _referrer_partner.wallet_address;
         transferFromDappContract(_referrer_partner_address, _amount);
+        referralBonusLogs(msg.sender, _referrer_partner_address, _amount);
         partnersByEbrCode[invited_ebr_code] = partner;
         position_ids.push(position_id);
         partnersByPositionId[position_id] = partner;
@@ -842,6 +851,15 @@ contract Genealogy is Ownable, ReentrancyGuard {
                         one_of_upline_partners_wallet_address,
                         _reward
                     );
+                    TransactionsLog memory transactionslog = TransactionsLog(
+                        partner_wallet_address,
+                        _reward,
+                        "uni_level_bonus",
+                        block.timestamp
+                    );
+                    transactionLogsByAddress[
+                        one_of_upline_partners_wallet_address
+                    ].push(transactionslog);
                 }
             }
             _position_id = calcUplineFromPositionId(_position_id);
@@ -876,6 +894,15 @@ contract Genealogy is Ownable, ReentrancyGuard {
                 uint256 binary_reward = left_balance / 10;
                 matchingBonus(position_ids[i], binary_reward);
                 transferFromDappContract(partner_wallet_address, binary_reward);
+                TransactionsLog memory transactionslog = TransactionsLog(
+                    partner_wallet_address,
+                    binary_reward,
+                    "binary_reward",
+                    block.timestamp
+                );
+                transactionLogsByAddress[partner_wallet_address].push(
+                    transactionslog
+                );
                 uint256 left_and_right_balance_difference = right_balance -
                     left_balance;
                 partner.sum_left_balance = 0;
@@ -885,6 +912,15 @@ contract Genealogy is Ownable, ReentrancyGuard {
                 uint256 binary_reward = right_balance / 10;
                 matchingBonus(position_ids[i], binary_reward);
                 transferFromDappContract(partner_wallet_address, binary_reward);
+                TransactionsLog memory transactionslog = TransactionsLog(
+                    partner_wallet_address,
+                    binary_reward,
+                    "binary_reward",
+                    block.timestamp
+                );
+                transactionLogsByAddress[partner_wallet_address].push(
+                    transactionslog
+                );
                 uint256 left_and_right_balance_difference = left_balance -
                     right_balance;
                 partner.sum_left_balance = left_and_right_balance_difference;
@@ -914,6 +950,16 @@ contract Genealogy is Ownable, ReentrancyGuard {
                     _first_upline_partner_wallet_address,
                     _level_one_reward
                 );
+                address _behalf_of = partnersByPositionId[_position_id]
+                    .wallet_address;
+                TransactionsLog memory transactionslog = TransactionsLog(
+                    _behalf_of,
+                    _level_one_reward,
+                    "matching_bonus_being_level_one",
+                    block.timestamp
+                );
+                transactionLogsByAddress[_first_upline_partner_wallet_address]
+                    .push(transactionslog);
                 if (_position_id > 2) {
                     uint256 _second_upline = calcUplineFromPositionId(
                         _first_upline
@@ -928,6 +974,15 @@ contract Genealogy is Ownable, ReentrancyGuard {
                         _second_upline_partner_wallet_address,
                         _level_two_reward
                     );
+                    TransactionsLog memory transactionslog = TransactionsLog(
+                        _behalf_of,
+                        _level_two_reward,
+                        "mathing_bonus_being_level_two",
+                        block.timestamp
+                    );
+                    transactionLogsByAddress[
+                        _second_upline_partner_wallet_address
+                    ].push(transactionslog);
                     if (_position_id > 6) {
                         uint256 _third_upline = calcUplineFromPositionId(
                             _second_upline
@@ -942,9 +997,35 @@ contract Genealogy is Ownable, ReentrancyGuard {
                             _third_upline_partner_wallet_address,
                             _level_three_reward
                         );
+                        TransactionsLog
+                            memory transactionslog = TransactionsLog(
+                                _behalf_of,
+                                _level_three_reward,
+                                "matching_bonus_being_level_three",
+                                block.timestamp
+                            );
+                        transactionLogsByAddress[
+                            _third_upline_partner_wallet_address
+                        ].push(transactionslog);
                     }
                 }
             }
         }
+    }
+
+    function referralBonusLogs(
+        address _reffered_address,
+        address _referrer_partner_address,
+        uint256 _amount
+    ) public returns (string memory) {
+        TransactionsLog memory transactionslog = TransactionsLog(
+            msg.sender,
+            _amount,
+            "referral_bonus",
+            block.timestamp
+        );
+        transactionLogsByAddress[_referrer_partner_address].push(
+            transactionslog
+        );
     }
 }

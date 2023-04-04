@@ -242,9 +242,8 @@ contract Genealogy is Ownable, ReentrancyGuard {
     }
 
     function addPartnerFromLink(
-        string memory _invitation_link
-    ) public // returns (string memory result)
-    {
+        string memory _invitation_link // returns (string memory result)
+    ) public {
         require(userIsStaker(), "4");
         string memory direction;
         string memory invitation_link = _invitation_link;
